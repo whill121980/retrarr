@@ -1,0 +1,11 @@
+# Claude Code
+.claude/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+*~
