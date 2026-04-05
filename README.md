@@ -20,6 +20,7 @@ MiSTer-ROMweasel's archive.org identifiers (`nointro.snes`, etc.) went dark. Myr
 - **Region and filter options** -- show/hide betas, prototypes, demos, unlicensed titles
 - **AO486 integration** -- auto-generates MGL setnames and per-game configs for the 0MHz DOS Collection
 - **Multi-disc CHD organization** -- automatically groups disc images into per-game subdirectories
+- **Zaparoo integration** -- `--zaparoo` CLI mode for NFC-triggered downloads with progress gauge
 
 ## Supported Systems
 
@@ -94,6 +95,31 @@ Access settings from the main menu (Settings button):
 - **Region preference** -- filter by USA, Europe, Japan, World, or All
 - **Advanced** -- log level info, clear metadata cache
 
+### Zaparoo Mode
+
+Retrarr can be called directly from [Zaparoo](https://github.com/wizzomafizzo/zaparoo) to download a game on demand -- tap an NFC tag, Retrarr downloads the game (if not already present), and outputs the file path for Zaparoo to launch.
+
+```bash
+# Download a specific game (exact match)
+retrarr.sh --zaparoo SNES "Super Mario World (USA).zip"
+
+# Search by keyword (shows picker if multiple matches)
+retrarr.sh --zaparoo SNES "Mario"
+
+# Wildcard search
+retrarr.sh --zaparoo NES "*Mega Man*"
+
+# CHD / disc system
+retrarr.sh --zaparoo PSXUS "Crash Bandicoot"
+```
+
+- **Single match** -- downloads immediately with progress gauge
+- **Multiple matches** -- shows a selection menu
+- **Already downloaded** -- exits immediately, outputs existing file path
+- **No credentials** -- fails fast with error (run `retrarr.sh` interactively first to set up)
+
+The game file path is printed to stdout on success, making it easy to chain with other tools.
+
 ### Logging
 
 Retrarr logs to `/media/fat/Scripts/.config/retrarr/retrarr.log` at `info` level by default.
@@ -129,7 +155,6 @@ RETRARR_LOG_LEVEL=debug /media/fat/Scripts/retrarr.sh
 ## Credits
 
 - Inspired by [MiSTer-ROMweasel](https://github.com/Koston-0xDEADBEEF/MiSTer-ROMweasel) by Koston-0xDEADBEEF
-- ROM sets provided by [archive.org](https://archive.org)
 - Built for the [MiSTer FPGA](https://mister-devel.github.io/MkDocs_MiSTer/) community
 
 ## License
