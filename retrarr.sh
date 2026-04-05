@@ -37,6 +37,9 @@ init_static_globals () {
     typeset -gr PYTHON=$(which python3)   || { print -u2 "ERROR: python3 not found"   ; return 1 }
     typeset -gr OPENSSL=$(which openssl)  || { print -u2 "ERROR: openssl not found"   ; return 1 }
 
+    # Optional: aria2c for faster downloads (multi-connection, resume, torrent support)
+    typeset -gr ARIA2C=$(which aria2c 2>/dev/null || print "")
+
     # internetarchive CLI — pip3 install internetarchive
     typeset -gr IA=$(which ia 2>/dev/null || print "")
 
@@ -904,34 +907,75 @@ ni_download_rom () {
     # Get expected file size from XML for progress polling
     local filesize=$(get_tag_filesize "$tag")
 
-    # Start download in background
-    $CURL "${CURL_OPTS[@]}" -sL \
-        -H "Cookie: $IA_COOKIE" \
-        -H "Referer: $referer" \
-        "$url" -o "$ofile" &
-    local curl_pid=$!
+    if [[ -n $ARIA2C ]]; then
+        # aria2c: multi-connection download with built-in progress
+        log_debug "ni_download_rom: using aria2c"
+        # aria2c with file-size polling for progress (view_archive.php has no Content-Length)
+        log_debug "ni_download_rom: using aria2c"
+        $ARIA2C --check-certificate=false \
+            --header="Cookie: $IA_COOKIE" \
+            --header="Referer: $referer" \
+            --dir="$CACHE_DIR" --out="$filename" \
+            --file-allocation=none \
+            --console-log-level=warn \
+            --download-result=hide \
+            --auto-file-renaming=false \
+            --allow-overwrite=true \
+            --continue=true \
+            -x4 -s4 -q \
+            "$url" &
+        local dl_pid=$!
 
-    # Poll file size and feed gauge dialog
-    if [[ -n $filesize && $filesize -gt 0 ]]; then
-        {
-            while kill -0 $curl_pid 2>/dev/null; do
-                local current=0
-                [[ -f $ofile ]] && current=$(wc -c < "$ofile" 2>/dev/null || echo 0)
-                local pct=$(( current * 100 / filesize ))
-                [[ $pct -gt 100 ]] && pct=100
-                print "XXX\n${pct}\nDownloading: ${filename}\nXXX"
-                sleep 1
-            done
-            print "XXX\n100\nDownload complete!\nXXX"
-        } | $DIALOG --title "Downloading: ${filename}" \
-              --gauge "Fetching from archive.org..." 8 72 0
+        if [[ -n $filesize && $filesize -gt 0 ]]; then
+            {
+                while kill -0 $dl_pid 2>/dev/null; do
+                    local current=0
+                    [[ -f $ofile ]] && current=$(wc -c < "$ofile" 2>/dev/null || echo 0)
+                    local pct=$(( current * 100 / filesize ))
+                    [[ $pct -gt 100 ]] && pct=100
+                    print "XXX\n${pct}\nDownloading: ${filename}\nXXX"
+                    sleep 1
+                done
+                print "XXX\n100\nDownload complete!\nXXX"
+            } | $DIALOG --title "Downloading: ${filename}" \
+                  --gauge "Fetching from archive.org..." 8 72 0
+        else
+            $DIALOG --title "Downloading: ${filename}" \
+                --infobox "Fetching from archive.org...\n\n${filename}" 7 72
+            wait $dl_pid
+        fi
+
+        wait $dl_pid 2>/dev/null
     else
-        $DIALOG --title "Downloading: ${filename}" \
-            --infobox "Fetching from archive.org...\n\n${filename}" 7 72
-        wait $curl_pid
-    fi
+        # Fallback: curl with file-size polling
+        log_debug "ni_download_rom: using curl"
+        $CURL "${CURL_OPTS[@]}" -sL \
+            -H "Cookie: $IA_COOKIE" \
+            -H "Referer: $referer" \
+            "$url" -o "$ofile" &
+        local curl_pid=$!
 
-    wait $curl_pid 2>/dev/null
+        if [[ -n $filesize && $filesize -gt 0 ]]; then
+            {
+                while kill -0 $curl_pid 2>/dev/null; do
+                    local current=0
+                    [[ -f $ofile ]] && current=$(wc -c < "$ofile" 2>/dev/null || echo 0)
+                    local pct=$(( current * 100 / filesize ))
+                    [[ $pct -gt 100 ]] && pct=100
+                    print "XXX\n${pct}\nDownloading: ${filename}\nXXX"
+                    sleep 1
+                done
+                print "XXX\n100\nDownload complete!\nXXX"
+            } | $DIALOG --title "Downloading: ${filename}" \
+                  --gauge "Fetching from archive.org..." 8 72 0
+        else
+            $DIALOG --title "Downloading: ${filename}" \
+                --infobox "Fetching from archive.org...\n\n${filename}" 7 72
+            wait $curl_pid
+        fi
+
+        wait $curl_pid 2>/dev/null
+    fi
 
     log_debug "ni_download_rom: size=$([ -f $ofile ] && wc -c < $ofile || echo 0)"
 
@@ -1768,6 +1812,7 @@ main () {
 
     log_init
     log_info "IA=$([ -n \"$IA\" ] && echo available || echo missing)"
+    log_info "ARIA2C=$([ -n \"$ARIA2C\" ] && echo available || echo missing)"
 
     # CLI modes
     [[ $* == "/media/fat/_DOS Games" ]] && { ao486_setnames_all ; return }
