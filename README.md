@@ -46,7 +46,7 @@ Add the following to `/media/fat/downloader.ini` on your MiSTer:
 
 ```ini
 [retrarr]
-db_url = https://raw.githubusercontent.com/whill121980/retrarr/main/db/retrarr.json
+db_url = https://raw.githubusercontent.com/whill121980/retrarr/master/db/retrarr.json
 ```
 
 The next time `update_all` or `downloader` runs, Retrarr and its dependencies will be installed automatically.

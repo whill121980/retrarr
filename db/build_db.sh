@@ -28,7 +28,7 @@ cat > "$DB_OUT" << EOF
     "Scripts/retrarr.sh": {
       "hash": "${HASH}",
       "size": ${SIZE},
-      "url": "https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NAME}/main/retrarr.sh"
+      "url": "https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NAME}/master/retrarr.sh"
     }
   },
   "folders": {
