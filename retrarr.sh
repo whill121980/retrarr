@@ -1239,7 +1239,7 @@ game_menu () {
     local filter tmpdata st rominfo sub match mbegin mend n
 
     tmpdata=$($XMLLINT "$CORE_FILES_XML" \
-        --xpath "files/file[sha1]/@name" 2>/dev/null)
+        --xpath "files/file/@name" 2>/dev/null)
     all_tags=(${${${${${${(@f)tmpdata}#*\"}%\"*}:#^*.(7z|zip|chd)}//\&amp;/&}})
     unset tmpdata
 
@@ -1587,6 +1587,168 @@ settings_menu () {
     done
 }
 
+# ─── ZAPAROO MODE ──────────────────────────────────────────────────────────────
+# Called via: retrarr.sh --zaparoo CORE "game search term"
+# Downloads a specific game headlessly (with progress gauge), skips all menus.
+# Exits 0 on success (game ready to play), 1 on error.
+
+zaparoo_mode () {
+    setopt localoptions nowarnnestedvar
+    local zap_core=$1
+    local zap_search=$2
+
+    log_info "zaparoo_mode: core=$zap_core search='$zap_search'"
+
+    # Validate core exists in SUPPORTED_CORES
+    local valid=false
+    local -i zi
+    for (( zi=1; zi<${#SUPPORTED_CORES}; zi+=2 )); do
+        [[ ${SUPPORTED_CORES[zi]} == $zap_core ]] && { valid=true ; break }
+    done
+    if ! $valid; then
+        log_error "zaparoo_mode: unknown core '$zap_core'"
+        print -u2 "ERROR: Unknown core '$zap_core'"
+        return 1
+    fi
+
+    # Must have credentials already configured — no interactive prompts
+    if [[ -z $IA_EMAIL && -z $IA_PASS ]]; then
+        if [[ ! -f ~/.config/internetarchive/ia.ini && \
+              ! -f ~/.config/ia.ini && \
+              ! -f ~/.ia ]]; then
+            log_error "zaparoo_mode: no archive.org credentials configured"
+            print -u2 "ERROR: archive.org credentials not configured. Run retrarr.sh first to set up."
+            return 1
+        fi
+    fi
+    if [[ -z $IA ]]; then
+        log_error "zaparoo_mode: internetarchive CLI not installed"
+        print -u2 "ERROR: internetarchive CLI not installed. Run retrarr.sh first to set up."
+        return 1
+    fi
+
+    # Auth — declare globals that init functions will set
+    typeset -g IA_COOKIE NI_NODE NI_DIR
+    init_ia_cookie
+    if [[ -z $IA_COOKIE ]]; then
+        log_error "zaparoo_mode: failed to authenticate with archive.org"
+        print -u2 "ERROR: Failed to authenticate with archive.org"
+        return 1
+    fi
+    init_ni_roms_node
+
+    # Set up core
+    select_core $zap_core
+
+    # Build metadata for this core only (no dialog gauge)
+    case $CORE_BACKEND in
+        ni)
+            fetch_ni_metadata
+            build_ni_system_xml $zap_core
+            ;;
+        ia)
+            local bare_files=${(P)${:-${zap_core}_FILES_XML}}
+            local bare_meta=${(P)${:-${zap_core}_META_XML}}
+            fetch_ia_metadata "$CORE_IA_IDENTIFIER" "$bare_files" "$bare_meta"
+            ;;
+    esac
+
+    # Search for matching game in XML
+    local tmpdata
+    tmpdata=$($XMLLINT "$CORE_FILES_XML" \
+        --xpath "files/file/@name" 2>/dev/null)
+    local -a all_tags=(${${${${${${(@f)tmpdata}#*\"}%\"*}:#^*.(7z|zip|chd)}//\&amp;/&}})
+    unset tmpdata
+
+    if [[ -z $all_tags ]]; then
+        log_error "zaparoo_mode: no games found in metadata for $zap_core"
+        print -u2 "ERROR: No games found in metadata for $zap_core"
+        return 1
+    fi
+
+    # Find matching tag (case-insensitive substring match)
+    # If search already has wildcards, use as-is; otherwise wrap with *
+    local zap_pattern=$zap_search
+    [[ $zap_pattern != *[\*\?]* ]] && zap_pattern="*${zap_pattern}*"
+    local -a matches=(${(M)all_tags:#(#i)${~zap_pattern}})
+
+    if [[ ${#matches} -eq 0 ]]; then
+        log_error "zaparoo_mode: no match for '$zap_search' in $zap_core"
+        print -u2 "ERROR: No match for '$zap_search' in $zap_core"
+        return 1
+    fi
+
+    local tag filename
+
+    if (( ${#matches} == 1 )); then
+        tag=${matches[1]}
+        filename=${tag##*/}
+        log_info "zaparoo_mode: single match '$filename'"
+    else
+        # Multiple matches — show selection menu
+        log_info "zaparoo_mode: ${#matches} matches for '$zap_search', showing picker"
+        local -a menu_items=()
+        local m
+        for m in ${(o)matches}; do
+            menu_items+=("$m" "${m##*/}")
+        done
+        $DIALOG --title "Multiple Matches" \
+            --menu "${#matches} games match '${zap_search}'.\nSelect one:" \
+            0 0 0 $menu_items 2>$DIALOG_TEMPFILE
+        if [[ $? -ne $DIALOG_OK ]]; then
+            log_info "zaparoo_mode: user cancelled selection"
+            return 1
+        fi
+        tag=$(<$DIALOG_TEMPFILE)
+        filename=${tag##*/}
+        log_info "zaparoo_mode: user selected '$filename'"
+    fi
+
+    # Check if game already exists in game directory
+    local dest_dir="$CORE_GAMEDIR"
+    [[ $CORE_BACKEND == "ia" ]] && dest_dir=$(get_rom_gamedir "$tag")
+
+    local check_name=${${filename%.zip}%.7z}
+    check_name=${check_name%.chd}
+
+    # Look for extracted file or CHD in destination
+    local -a existing=(${dest_dir}/${check_name}*(N))
+    if [[ -n $existing ]]; then
+        log_info "zaparoo_mode: '$check_name' already exists in $dest_dir"
+        print "${existing[1]}"
+        return 0
+    fi
+
+    # Download with progress gauge
+    [[ -d $dest_dir ]] || mkdir -p "$dest_dir"
+
+    local dl_ok=false
+    case $CORE_BACKEND in
+        ni)
+            ni_download_rom "$tag" "$dest_dir" && dl_ok=true
+            ;;
+        ia)
+            ia_download_rom "$CORE_IA_IDENTIFIER" "$tag" "$dest_dir" && dl_ok=true
+            ;;
+    esac
+
+    if ! $dl_ok; then
+        log_error "zaparoo_mode: download failed for '$filename'"
+        print -u2 "ERROR: Download failed for '$filename'"
+        return 1
+    fi
+
+    # Output final game path for caller (e.g. Zaparoo) to launch
+    local -a installed=(${dest_dir}/${check_name}*(N))
+    if [[ -n $installed ]]; then
+        print "${installed[1]}"
+    else
+        print "${dest_dir}/${check_name}"
+    fi
+    log_info "zaparoo_mode: complete — '$filename' ready in $dest_dir"
+    return 0
+}
+
 # ─── MAIN ──────────────────────────────────────────────────────────────────────
 
 main () {
@@ -1607,9 +1769,14 @@ main () {
     log_init
     log_info "IA=$([ -n \"$IA\" ] && echo available || echo missing)"
 
-    # Secret CLI features
+    # CLI modes
     [[ $* == "/media/fat/_DOS Games" ]] && { ao486_setnames_all ; return }
     [[ -n $* && -d $* ]] && { organise_chd_dir $* ; return }
+    if [[ $1 == "--zaparoo" ]]; then
+        [[ -z $2 || -z $3 ]] && { print -u2 "Usage: retrarr.sh --zaparoo CORE \"game name\"" ; return 1 }
+        zaparoo_mode "$2" "$3"
+        return $?
+    fi
 
     bootstrap_deps
     check_ia
@@ -1669,4 +1836,4 @@ Added:   $d" 11 72 ;;
     cleanup
 }
 
-main $*
+main "$@"
