@@ -1040,7 +1040,7 @@ build_minerva_system_list () {
 
     # Redump sets contain CHD/BIN+CUE in zip — match more extensions
     local ext_pattern='zip'
-    [[ $collection == "redump" ]] && ext_pattern='(zip|chd|7z)'
+    [[ $collection == "redump" ]] && ext_pattern='(?:zip|chd|7z)'
 
     local py_tmp=$(mktemp /tmp/retrarr_minerva_XXXXXX.py)
     cat > "$py_tmp" << PYEOF
