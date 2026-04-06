@@ -61,9 +61,10 @@ init_static_globals () {
     typeset -gr NI_META_URL="https://archive.org/metadata/ni-roms"
 
     # Minerva Archive — RetroAchievements verified ROM sets
-    # Individual files served via /rom?name= HTTP endpoint (no auth required)
+    # Downloads via BitTorrent (per-system torrent, selective file via aria2c)
     typeset -gr MINERVA_BASE_URL="https://minerva-archive.org"
     typeset -gr RA_CACHE_DIR="${WRK_DIR}/ra_cache"
+    typeset -gr RA_TORRENT_PREFIX="Minerva_Myrient_v0.3"
 
     # Populated at runtime by init_ni_roms_node() and init_ia_cookie()
     typeset -g NI_NODE=""    # e.g. ia902803.us.archive.org
@@ -974,90 +975,155 @@ PYEOF
     log_debug "build_ra_system_list: $core result=$result"
 }
 
-# Download a ROM via Minerva Archive RetroAchievements HTTP endpoint
+# Download a ROM via Minerva Archive BitTorrent (per-system torrent, selective file)
 ra_download_rom () {
     local tag=$1       # bare game filename e.g. "Contra (USA).zip"
     local dest_dir=$2
     local filename=${tag##*/}
-    local ofile="${CACHE_DIR}/${filename}"
 
-    # Build Minerva /rom?name= URL
-    local encoded_path=$(urlencode "RetroAchievements/${CORE_RA_DIR}/${filename}")
-    local url="${MINERVA_BASE_URL}/rom?name=.%2F${encoded_path}"
-
-    log_info "ra_download_rom: $filename"
-    log_debug "ra_download_rom: url=$url"
-
-    if [[ -n $ARIA2C ]]; then
-        log_debug "ra_download_rom: using aria2c"
-        $ARIA2C --check-certificate=false \
-            --dir="$CACHE_DIR" --out="$filename" \
-            --file-allocation=none \
-            --console-log-level=warn \
-            --download-result=hide \
-            --auto-file-renaming=false \
-            --allow-overwrite=true \
-            --continue=true \
-            -x4 -s4 -q \
-            "$url" &
-        local dl_pid=$!
-
-        # Get file size from RA XML for progress
-        local filesize=""
-        [[ -f $CORE_RA_XML ]] && \
-            filesize=$($XMLLINT "$CORE_RA_XML" \
-                --xpath "string(files/file[@name=\"${tag}\"]/size)" 2>/dev/null)
-
-        if [[ -n $filesize && $filesize -gt 0 ]]; then
-            {
-                while kill -0 $dl_pid 2>/dev/null; do
-                    local current=0
-                    [[ -f $ofile ]] && current=$(wc -c < "$ofile" 2>/dev/null || echo 0)
-                    local pct=$(( current * 100 / filesize ))
-                    [[ $pct -gt 100 ]] && pct=100
-                    print "XXX\n${pct}\nDownloading: ${filename}\nXXX"
-                    sleep 1
-                done
-                print "XXX\n100\nDownload complete!\nXXX"
-            } | $DIALOG --title "Downloading: ${filename}" \
-                  --gauge "Fetching from Minerva Archive (RA)..." 8 72 0
-        else
-            $DIALOG --title "Downloading: ${filename}" \
-                --infobox "Fetching from Minerva Archive (RA)...\n\n${filename}" 7 72
-            wait $dl_pid
-        fi
-
-        wait $dl_pid 2>/dev/null
-    else
-        log_debug "ra_download_rom: using curl"
-        $CURL "${CURL_OPTS[@]}" -sL \
-            "$url" -o "$ofile" &
-        local curl_pid=$!
-
-        $DIALOG --title "Downloading: ${filename}" \
-            --infobox "Fetching from Minerva Archive (RA)...\n\n${filename}" 7 72
-        wait $curl_pid
-    fi
-
-    log_debug "ra_download_rom: size=$([ -f $ofile ] && wc -c < $ofile || echo 0)"
-
-    if [[ ! -f $ofile || ! -s $ofile ]]; then
+    # Require aria2c for torrent downloads
+    if [[ -z $ARIA2C ]]; then
+        log_error "ra_download_rom: aria2c required for Minerva torrent downloads"
         $DIALOG --title "$TITLE" --msgbox \
-            "Download failed for:\n${filename}\n\nMinerva Archive may be unreachable." \
-            9 60
+            "aria2c is required for Minerva Archive downloads.\n\nInstall it with: apt-get install aria2" 8 60
         return 1
     fi
 
-    # Reject HTML error pages
-    local magic=$(head -c 15 "$ofile" 2>/dev/null)
-    if [[ $magic == *"<!DOCTYPE"* || $magic == *"<html"* ]]; then
-        log_error "ra_download_rom: got HTML instead of file"
-        rm -f "$ofile"
+    log_info "ra_download_rom: $filename"
+
+    # Get/cache the per-system torrent file
+    local torrent_name="Minerva_Myrient - RetroAchievements - ${CORE_RA_DIR}.torrent"
+    local torrent_file="${RA_CACHE_DIR}/${CORE}_ra.torrent"
+    if [[ ! -f $torrent_file ]]; then
+        local encoded_name=$(urlencode "$torrent_name")
+        local torrent_url="${MINERVA_BASE_URL}/assets/${RA_TORRENT_PREFIX}/${encoded_name}"
+        log_info "ra_download_rom: fetching torrent from $torrent_url"
+        $CURL "${CURL_OPTS[@]}" -sL "$torrent_url" -o "$torrent_file"
+        if [[ ! -f $torrent_file || ! -s $torrent_file ]]; then
+            log_error "ra_download_rom: failed to download torrent file"
+            rm -f "$torrent_file"
+            $DIALOG --title "$TITLE" --msgbox \
+                "Failed to download torrent for ${CORE_RA_DIR}.\n\nMinerva Archive may be unreachable." 8 60
+            return 1
+        fi
+        log_debug "ra_download_rom: torrent cached at $torrent_file"
+    fi
+
+    # Parse torrent to find file index for target game (aria2c uses 1-based indices)
+    local file_index
+    file_index=$($PYTHON << PYEOF
+import sys
+
+def bdecode(data, idx=0):
+    ch = chr(data[idx])
+    if ch == 'i':
+        end = data.index(b'e', idx)
+        return int(data[idx+1:end]), end+1
+    elif ch == 'l':
+        idx += 1
+        result = []
+        while chr(data[idx]) != 'e':
+            val, idx = bdecode(data, idx)
+            result.append(val)
+        return result, idx+1
+    elif ch == 'd':
+        idx += 1
+        result = {}
+        while chr(data[idx]) != 'e':
+            key, idx = bdecode(data, idx)
+            val, idx = bdecode(data, idx)
+            result[key if isinstance(key, str) else key.decode()] = val
+        return result, idx+1
+    elif ch.isdigit():
+        colon = data.index(b':', idx)
+        length = int(data[idx:colon])
+        s = data[colon+1:colon+1+length]
+        try: s = s.decode('utf-8')
+        except: pass
+        return s, colon+1+length
+    else:
+        raise ValueError(f'Unexpected at {idx}')
+
+target = "${filename}"
+with open("${torrent_file}", 'rb') as f:
+    torrent, _ = bdecode(f.read())
+info = torrent['info']
+if 'files' in info:
+    for i, entry in enumerate(info['files']):
+        path = '/'.join(p if isinstance(p, str) else p.decode() for p in entry['path'])
+        if path.endswith(target):
+            print(i + 1)
+            sys.exit(0)
+print(0)
+sys.exit(1)
+PYEOF
+)
+
+    if [[ -z $file_index || $file_index -eq 0 ]]; then
+        log_error "ra_download_rom: '$filename' not found in torrent index"
         $DIALOG --title "$TITLE" --msgbox \
-            "Download returned an error page for:\n${filename}\n\nThe file may not be available on Minerva." \
+            "Could not find ${filename} in Minerva torrent.\n\nThe file may not be in this set." 8 60
+        return 1
+    fi
+
+    log_info "ra_download_rom: $filename -> torrent file index $file_index"
+
+    # Download via aria2c BitTorrent with selective file download
+    local bt_dir="${CACHE_DIR}/ra_bt"
+    mkdir -p "$bt_dir"
+
+    $DIALOG --title "Downloading: ${filename}" \
+        --infobox "Fetching from Minerva Archive via BitTorrent...\n\n${filename}\n(Finding peers...)" 8 72
+
+    $ARIA2C --select-file=$file_index \
+        --dir="$bt_dir" \
+        --seed-time=0 \
+        --bt-stop-timeout=120 \
+        --file-allocation=none \
+        --console-log-level=error \
+        --download-result=hide \
+        --check-certificate=false \
+        -q \
+        "$torrent_file" 2>>"$LOG_FILE"
+
+    local aria_ret=$?
+    log_debug "ra_download_rom: aria2c exit=$aria_ret"
+
+    # Find the downloaded file in the nested torrent directory structure
+    # Torrent extracts to: bt_dir/Minerva_Myrient/RetroAchievements/RA - System/filename
+    local -a found_files=(${bt_dir}/**/${filename}(N))
+    if [[ -z $found_files ]]; then
+        log_error "ra_download_rom: file not found after torrent download"
+        rm -rf "$bt_dir"
+        $DIALOG --title "$TITLE" --msgbox \
+            "Torrent download failed for:\n${filename}\n\nNo seeders may be available. Try again later." 9 60
+        return 1
+    fi
+
+    local ofile="${found_files[1]}"
+    local actual_size=$(wc -c < "$ofile" 2>/dev/null || echo 0)
+    log_debug "ra_download_rom: found at $ofile ($actual_size bytes)"
+
+    # Verify file size against RA catalog to catch truncated downloads
+    local expected_size=""
+    [[ -f $CORE_RA_XML ]] && \
+        expected_size=$($XMLLINT "$CORE_RA_XML" \
+            --xpath "string(files/file[@name=\"${tag}\"]/size)" 2>/dev/null)
+    if [[ -n $expected_size && $expected_size -gt 0 && $actual_size -ne $expected_size ]]; then
+        log_error "ra_download_rom: size mismatch — expected=$expected_size actual=$actual_size"
+        rm -rf "$bt_dir"
+        $DIALOG --title "Download Error" --msgbox \
+            "Size mismatch for ${filename}!\n\nExpected: ${expected_size} bytes\nGot:      ${actual_size} bytes\n\nThe download may be incomplete." \
             10 65
         return 1
     fi
+
+    # Move only the target file to cache dir — discard any piece-boundary spillover
+    mv "$ofile" "${CACHE_DIR}/${filename}"
+    ofile="${CACHE_DIR}/${filename}"
+
+    # Clean up torrent working directory (removes partial spillover files)
+    rm -rf "$bt_dir"
 
     # Extract to destination
     [[ -d $dest_dir ]] || mkdir -p "$dest_dir"

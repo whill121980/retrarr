@@ -1,10 +1,10 @@
 {
   "db_id": "retrarr",
-  "timestamp": 1775447865,
+  "timestamp": 1775449184,
   "files": {
     "Scripts/retrarr.sh": {
-      "hash": "6eecf8ccfcd8c1a517a83c0face04753",
-      "size": 91070,
+      "hash": "dc88ba3cceaab5627e9f7205645ac2e7",
+      "size": 93698,
       "url": "https://raw.githubusercontent.com/whill121980/retrarr/devel/retrarr.sh"
     }
   },
