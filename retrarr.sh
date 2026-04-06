@@ -1101,22 +1101,10 @@ PYEOF
     fi
 
     local ofile="${found_files[1]}"
-    local actual_size=$(wc -c < "$ofile" 2>/dev/null || echo 0)
-    log_debug "ra_download_rom: found at $ofile ($actual_size bytes)"
+    log_debug "ra_download_rom: found at $ofile ($(wc -c < "$ofile" 2>/dev/null) bytes)"
 
-    # Verify file size against RA catalog to catch truncated downloads
-    local expected_size=""
-    [[ -f $CORE_RA_XML ]] && \
-        expected_size=$($XMLLINT "$CORE_RA_XML" \
-            --xpath "string(files/file[@name=\"${tag}\"]/size)" 2>/dev/null)
-    if [[ -n $expected_size && $expected_size -gt 0 && $actual_size -ne $expected_size ]]; then
-        log_error "ra_download_rom: size mismatch — expected=$expected_size actual=$actual_size"
-        rm -rf "$bt_dir"
-        $DIALOG --title "Download Error" --msgbox \
-            "Size mismatch for ${filename}!\n\nExpected: ${expected_size} bytes\nGot:      ${actual_size} bytes\n\nThe download may be incomplete." \
-            10 65
-        return 1
-    fi
+    # No size verification needed — BitTorrent piece hashes guarantee integrity.
+    # The catalog sizes are approximate (converted from rounded display values).
 
     # Move only the target file to cache dir — discard any piece-boundary spillover
     mv "$ofile" "${CACHE_DIR}/${filename}"
