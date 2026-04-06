@@ -1,10 +1,11 @@
 #!/bin/zsh
-# retrarr.sh — Retro Retriever v0.2.1
+# retrarr.sh — Retro Retriever v0.3.0-dev
 # Spiritual successor to MiSTer-ROMweasel by Koston-0xDEADBEEF
 #
 # Sources:
 #   No-Intro sets : archive.org/details/ni-roms  (view_archive.php streaming)
 #   CHD/disc sets : archive.org (ia download)
+#   RetroAchievements : minerva-archive.org (HTTP /rom endpoint, preferred)
 #
 # Requirements:
 #   - internetarchive CLI : pip3 install internetarchive
@@ -22,7 +23,7 @@ autoload zmv
 # ─── STATIC GLOBALS ────────────────────────────────────────────────────────────
 
 init_static_globals () {
-    typeset -gr RETRARR_VERSION="Retro Retriever v0.2.1"
+    typeset -gr RETRARR_VERSION="Retro Retriever v0.3.0-dev"
 
     # Required binaries
     typeset -gr XMLLINT=$(which xmllint)  || { print -u2 "ERROR: xmllint not found"  ; return 1 }
@@ -58,6 +59,11 @@ init_static_globals () {
     typeset -gr NI_IDENTIFIER="ni-roms"
     typeset -gr NI_FILES_XML="${WRK_DIR}/ni-roms_files.xml"
     typeset -gr NI_META_URL="https://archive.org/metadata/ni-roms"
+
+    # Minerva Archive — RetroAchievements verified ROM sets
+    # Individual files served via /rom?name= HTTP endpoint (no auth required)
+    typeset -gr MINERVA_BASE_URL="https://minerva-archive.org"
+    typeset -gr RA_CACHE_DIR="${WRK_DIR}/ra_cache"
 
     # Populated at runtime by init_ni_roms_node() and init_ia_cookie()
     typeset -g NI_NODE=""    # e.g. ia902803.us.archive.org
@@ -363,6 +369,43 @@ init_static_globals () {
     # typeset -gr NEOGEO_BACKEND="???"
     # typeset -gr NEOGEO_GAMEDIR_DEFAULT="/media/fat/games/NEOGEO"
 
+    # ── Minerva RetroAchievements: system directory mappings ───────────────
+    # Maps core IDs to Minerva RA browse directory names.
+    # RA sets are curated for RetroAchievements hash compatibility.
+    # Only cartridge/ROM-based systems for now; disc systems in a future release.
+    typeset -gA RA_SYSTEM_DIR=(
+        NES       "RA - Nintendo Entertainment System"
+        SNES      "RA - Super Nintendo Entertainment System"
+        N64       "RA - Nintendo 64"
+        GB        "RA - Nintendo Game Boy"
+        GBC       "RA - Nintendo Game Boy Color"
+        GBA       "RA - Nintendo Game Boy Advance"
+        POKEMINI  "RA - Nintendo Pokemon Mini"
+        A2600     "RA - Atari 2600"
+        A7800     "RA - Atari 7800"
+        LYNX      "RA - Atari Lynx"
+        TG16      "RA - NEC TurboGrafx-16"
+        SMS       "RA - Sega Master System"
+        GG        "RA - Sega Game Gear"
+        SG1000    "RA - Sega SG-1000"
+        MD        "RA - Sega Genesis"
+        S32X      "RA - Sega 32X"
+        NGP       "RA - SNK Neo Geo Pocket"
+        COLECO    "RA - Colecovision"
+        VECTREX   "RA - GCE Vectrex"
+        ODYSSEY2  "RA - Magnavox Odyssey 2"
+        CHANNELF  "RA - Fairchild Channel F"
+        INTV      "RA - Mattel Intellivision"
+        ARCADIA   "RA - Emerson Arcadia 2001"
+        MEGADUCK  "RA - Mega Duck"
+        WS        "RA - WonderSwan"
+        MSX       "RA - Microsoft MSX"
+    )
+
+    # Global source tracking — maps game tag -> "ra" | "ni" | "ia"
+    # Populated by game_menu when building unified game lists
+    typeset -gA GAME_SOURCE=()
+
     # ── Internet Archive backend: CHD/disc sets ────────────────────────────────
 
     typeset -gr TG16CD_BACKEND="ia"
@@ -525,6 +568,10 @@ select_core () {
             typeset -g CORE_META_XML="${WRK_DIR}/${(P)${:-${CORE}_META_XML}}"
             ;;
     esac
+
+    # RA source — set if this core has a Minerva RetroAchievements directory
+    typeset -g CORE_RA_DIR="${RA_SYSTEM_DIR[$CORE]:-}"
+    typeset -g CORE_RA_XML="${RA_CACHE_DIR}/${CORE}_ra.xml"
 }
 
 # ─── LOGGING ───────────────────────────────────────────────────────────────────
@@ -861,6 +908,171 @@ PYEOF
     log_debug "build_ni_system_xml: $core result=$result"
 }
 
+# Build per-system game list by scraping Minerva RA browse page
+build_ra_system_list () {
+    local core=$1
+    local ra_dir=${RA_SYSTEM_DIR[$core]:-}
+    local out="${RA_CACHE_DIR}/${core}_ra.xml"
+
+    [[ -z $ra_dir ]] && return 1
+    [[ -f $out ]] && { log_info "build_ra_system_list: $core cached" ; return 0 }
+    log_info "build_ra_system_list: $core ($ra_dir)"
+
+    local encoded_dir=$(urlencode "$ra_dir")
+    local url="${MINERVA_BASE_URL}/browse/RetroAchievements/${encoded_dir}/"
+
+    local py_tmp=$(mktemp /tmp/retrarr_ra_XXXXXX.py)
+    cat > "$py_tmp" << PYEOF
+import sys, re, urllib.parse, html, os
+
+out_path = "${out}"
+ra_dir   = "${ra_dir}"
+content  = sys.stdin.read()
+
+# Minerva browse pages: <a href="/rom?name=...">filename</a> ... <td>size</td>
+# Extract filenames from /rom?name= links
+link_re = re.compile(
+    r'href="/rom\?name=[^"]*%2F([^"]+\.zip)"',
+    re.IGNORECASE
+)
+size_re = re.compile(r'<td[^>]*>\s*([\d.]+)\s*(B|KB|MB|GB)\s*</td>', re.IGNORECASE)
+
+links = link_re.findall(content)
+sizes = size_re.findall(content)
+
+if not links:
+    print(f'ERROR:no entries found for {ra_dir}', file=sys.stderr)
+    sys.exit(1)
+
+def parse_size(val, unit):
+    """Convert human-readable size to bytes."""
+    v = float(val)
+    mult = {'B': 1, 'KB': 1024, 'MB': 1048576, 'GB': 1073741824}
+    return int(v * mult.get(unit.upper(), 1))
+
+lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<files>']
+for i, href in enumerate(links):
+    game = urllib.parse.unquote(href)
+    game = html.unescape(game)
+    size = str(parse_size(sizes[i][0], sizes[i][1])) if i < len(sizes) else '0'
+    lines.append(f'  <file name="{html.escape(game)}">')
+    lines.append(f'    <size>{size}</size>')
+    lines.append(f'    <sha1></sha1>')
+    lines.append(f'  </file>')
+
+lines.append('</files>')
+os.makedirs(os.path.dirname(out_path), exist_ok=True)
+with open(out_path, 'w', encoding='utf-8') as fh:
+    fh.write('\n'.join(lines))
+print(f'OK:{len(links)}')
+PYEOF
+
+    local result
+    result=$($CURL "${CURL_OPTS[@]}" -sL "$url" 2>/dev/null | $PYTHON "$py_tmp" 2>>"$LOG_FILE")
+
+    rm -f "$py_tmp"
+    log_debug "build_ra_system_list: $core result=$result"
+}
+
+# Download a ROM via Minerva Archive RetroAchievements HTTP endpoint
+ra_download_rom () {
+    local tag=$1       # bare game filename e.g. "Contra (USA).zip"
+    local dest_dir=$2
+    local filename=${tag##*/}
+    local ofile="${CACHE_DIR}/${filename}"
+
+    # Build Minerva /rom?name= URL
+    local encoded_path=$(urlencode "RetroAchievements/${CORE_RA_DIR}/${filename}")
+    local url="${MINERVA_BASE_URL}/rom?name=.%2F${encoded_path}"
+
+    log_info "ra_download_rom: $filename"
+    log_debug "ra_download_rom: url=$url"
+
+    if [[ -n $ARIA2C ]]; then
+        log_debug "ra_download_rom: using aria2c"
+        $ARIA2C --check-certificate=false \
+            --dir="$CACHE_DIR" --out="$filename" \
+            --file-allocation=none \
+            --console-log-level=warn \
+            --download-result=hide \
+            --auto-file-renaming=false \
+            --allow-overwrite=true \
+            --continue=true \
+            -x4 -s4 -q \
+            "$url" &
+        local dl_pid=$!
+
+        # Get file size from RA XML for progress
+        local filesize=""
+        [[ -f $CORE_RA_XML ]] && \
+            filesize=$($XMLLINT "$CORE_RA_XML" \
+                --xpath "string(files/file[@name=\"${tag}\"]/size)" 2>/dev/null)
+
+        if [[ -n $filesize && $filesize -gt 0 ]]; then
+            {
+                while kill -0 $dl_pid 2>/dev/null; do
+                    local current=0
+                    [[ -f $ofile ]] && current=$(wc -c < "$ofile" 2>/dev/null || echo 0)
+                    local pct=$(( current * 100 / filesize ))
+                    [[ $pct -gt 100 ]] && pct=100
+                    print "XXX\n${pct}\nDownloading: ${filename}\nXXX"
+                    sleep 1
+                done
+                print "XXX\n100\nDownload complete!\nXXX"
+            } | $DIALOG --title "Downloading: ${filename}" \
+                  --gauge "Fetching from Minerva Archive (RA)..." 8 72 0
+        else
+            $DIALOG --title "Downloading: ${filename}" \
+                --infobox "Fetching from Minerva Archive (RA)...\n\n${filename}" 7 72
+            wait $dl_pid
+        fi
+
+        wait $dl_pid 2>/dev/null
+    else
+        log_debug "ra_download_rom: using curl"
+        $CURL "${CURL_OPTS[@]}" -sL \
+            "$url" -o "$ofile" &
+        local curl_pid=$!
+
+        $DIALOG --title "Downloading: ${filename}" \
+            --infobox "Fetching from Minerva Archive (RA)...\n\n${filename}" 7 72
+        wait $curl_pid
+    fi
+
+    log_debug "ra_download_rom: size=$([ -f $ofile ] && wc -c < $ofile || echo 0)"
+
+    if [[ ! -f $ofile || ! -s $ofile ]]; then
+        $DIALOG --title "$TITLE" --msgbox \
+            "Download failed for:\n${filename}\n\nMinerva Archive may be unreachable." \
+            9 60
+        return 1
+    fi
+
+    # Reject HTML error pages
+    local magic=$(head -c 15 "$ofile" 2>/dev/null)
+    if [[ $magic == *"<!DOCTYPE"* || $magic == *"<html"* ]]; then
+        log_error "ra_download_rom: got HTML instead of file"
+        rm -f "$ofile"
+        $DIALOG --title "$TITLE" --msgbox \
+            "Download returned an error page for:\n${filename}\n\nThe file may not be available on Minerva." \
+            10 65
+        return 1
+    fi
+
+    # Extract to destination
+    [[ -d $dest_dir ]] || mkdir -p "$dest_dir"
+    if [[ $ofile == *.zip ]]; then
+        $UNZIP -o -qq -d "$dest_dir" "$ofile" && rm -f "$ofile"
+    elif [[ $ofile == *.7z ]]; then
+        $SZR e "$ofile" -o"$dest_dir" -y && rm -f "$ofile"
+    else
+        mv "$ofile" "$dest_dir"
+    fi
+
+    log_info "ra_download_rom: complete -> $dest_dir"
+    return 0
+}
+
 # Download CHD set metadata XMLs via ia
 fetch_ia_metadata () {
     local identifier=$1
@@ -896,15 +1108,16 @@ fetch_ia_metadata () {
 
 # Main metadata fetch — called once at startup
 fetch_metadata () {
-    local -a ni_cached ia_cached
+    local -a ni_cached ia_cached ra_cached
     ni_cached=($(print ${NI_CACHE_DIR}/*_files.xml(N)))
     ia_cached=($(print ${WRK_DIR}/chd_*(N) ${WRK_DIR}/0mhz*(N) ${WRK_DIR}/commodore*(N)))
+    ra_cached=($(print ${RA_CACHE_DIR}/*_ra.xml(N)))
 
-    if [[ -f $NI_FILES_XML || -n $ni_cached || -n $ia_cached ]]; then
+    if [[ -f $NI_FILES_XML || -n $ni_cached || -n $ia_cached || -n $ra_cached ]]; then
         $DIALOG --title "$TITLE" --defaultno \
             --yesno "Re-download all ROM catalog metadata?\n\n(Only needed if catalogs have been updated)" 7 62
         if [[ $? -eq $DIALOG_OK ]]; then
-            rm -f $ni_cached $ia_cached "$NI_FILES_XML"
+            rm -f $ni_cached $ia_cached $ra_cached "$NI_FILES_XML"
         fi
     fi
 
@@ -932,6 +1145,9 @@ fetch_metadata () {
                 fetch_ia_metadata "$CORE_IA_IDENTIFIER" "$bare_files" "$bare_meta"
                 ;;
         esac
+
+        # Also build RA catalog if this core has a Minerva RA directory
+        [[ -n ${RA_SYSTEM_DIR[$core]:-} ]] && build_ra_system_list $core
     done) | $DIALOG --title "$TITLE" --gauge \
         "Building ROM catalog..." 10 $(( $MAXWIDTH / 2 )) 0
 
@@ -1281,15 +1497,42 @@ download_roms () {
     local ok=0 fail=0
     for tag in $tags; do
         local dest
-        log_debug "download_roms: tag='$tag' backend=$CORE_BACKEND"
+        local tag_source=${GAME_SOURCE[$tag]:-$CORE_BACKEND}
+        log_debug "download_roms: tag='$tag' source=$tag_source backend=$CORE_BACKEND"
         case $CORE_BACKEND in
             ni)  dest="$CORE_GAMEDIR" ;;
             ia)  dest=$(get_rom_gamedir "$tag") ;;
         esac
+        # RA downloads go to same dest as the primary backend
+        [[ $tag_source == "ra" ]] && dest="$CORE_GAMEDIR"
         log_debug "download_roms: dest='$dest'"
         [[ -n $dest && ! -d $dest ]] && mkdir -p "$dest"
 
-        case $CORE_BACKEND in
+        case $tag_source in
+            ra)
+                if ra_download_rom "$tag" "$dest"; then
+                    (( ++ok ))
+                else
+                    # Fall back to primary backend on RA failure
+                    log_warn "download_roms: RA failed for '$tag', falling back to $CORE_BACKEND"
+                    case $CORE_BACKEND in
+                        ni)
+                            if ni_download_rom "$tag" "$dest"; then
+                                (( ++ok ))
+                            else
+                                (( ++fail ))
+                            fi
+                            ;;
+                        ia)
+                            if ia_download_rom "$CORE_IA_IDENTIFIER" "$tag" "$dest"; then
+                                (( ++ok ))
+                            else
+                                (( ++fail ))
+                            fi
+                            ;;
+                    esac
+                fi
+                ;;
             ni)
                 if ni_download_rom "$tag" "$dest"; then
                     (( ++ok ))
@@ -1398,10 +1641,34 @@ game_menu () {
     local -i itemwidth retval i
     local filter tmpdata st rominfo sub match mbegin mend n
 
+    # Reset source tracking for this menu session
+    GAME_SOURCE=()
+
     tmpdata=$($XMLLINT "$CORE_FILES_XML" \
         --xpath "files/file/@name" 2>/dev/null)
     all_tags=(${${${${${${(@f)tmpdata}#*\"}%\"*}:#^*.(7z|zip|chd)}//\&amp;/&}})
     unset tmpdata
+
+    # Track source for primary backend tags
+    for n in $all_tags; do GAME_SOURCE[$n]="$CORE_BACKEND"; done
+
+    # Merge RA tags if available — RA preferred for duplicate filenames
+    if [[ -n $CORE_RA_DIR && -f $CORE_RA_XML ]]; then
+        tmpdata=$($XMLLINT "$CORE_RA_XML" \
+            --xpath "files/file/@name" 2>/dev/null)
+        local -a ra_tags=(${${${${${${(@f)tmpdata}#*\"}%\"*}:#^*.(7z|zip|chd)}//\&amp;/&}})
+        unset tmpdata
+
+        for n in $ra_tags; do
+            if (( ! ${all_tags[(Ie)$n]} )); then
+                # New game only in RA — add to list
+                all_tags+=("$n")
+            fi
+            # Mark as RA (overrides NI for duplicates — RA preferred)
+            GAME_SOURCE[$n]="ra"
+        done
+        log_info "game_menu: merged ${#ra_tags} RA entries for $CORE (total: ${#all_tags})"
+    fi
 
     if [[ -z $all_tags ]]; then
         $DIALOG --title "$TITLE" --msgbox \
@@ -1462,6 +1729,15 @@ game_menu () {
             (( ${selected_tags[(Ie)${menu_tags[$i]}]} )) && st="On" || st="0"
             $JOY_MODE && unset st
             local display=${${menu_tags[$i]##*/}%.(7z|zip|chd)}
+            # Prefix with source tag if RA source is available for this core
+            if [[ -n $CORE_RA_DIR && -f $CORE_RA_XML ]]; then
+                local src=${GAME_SOURCE[${menu_tags[$i]}]:-$CORE_BACKEND}
+                case $src in
+                    ra) display="[RA] ${display}" ;;
+                    ni) display="[NI] ${display}" ;;
+                    ia) display="[IA] ${display}" ;;
+                esac
+            fi
             menu_items+=(${menu_tags[$i]} ${display:0:$itemwidth} $st)
         done
 
@@ -1718,7 +1994,7 @@ settings_advanced () {
                 "Delete all cached metadata?\n\nThis will re-download index files on next launch.\nYour downloaded ROMs will not be affected." \
                 9 60
             if [[ $? -eq $DIALOG_OK ]]; then
-                rm -f ${WRK_DIR}/*.xml ${NI_CACHE_DIR}/*.xml
+                rm -f ${WRK_DIR}/*.xml ${NI_CACHE_DIR}/*.xml ${RA_CACHE_DIR}/*.xml
                 $DIALOG --title "Clear Cache" --msgbox "Cache cleared." 5 30
             fi ;;
     esac
@@ -1819,12 +2095,31 @@ zaparoo_mode () {
             ;;
     esac
 
-    # Search for matching game in XML
+    # Also build RA catalog if available
+    [[ -n ${RA_SYSTEM_DIR[$zap_core]:-} ]] && build_ra_system_list $zap_core
+
+    # Search for matching game in XML — merge NI/IA and RA sources
+    GAME_SOURCE=()
     local tmpdata
     tmpdata=$($XMLLINT "$CORE_FILES_XML" \
         --xpath "files/file/@name" 2>/dev/null)
     local -a all_tags=(${${${${${${(@f)tmpdata}#*\"}%\"*}:#^*.(7z|zip|chd)}//\&amp;/&}})
     unset tmpdata
+    local n
+    for n in $all_tags; do GAME_SOURCE[$n]="$CORE_BACKEND"; done
+
+    # Merge RA tags — RA preferred for duplicates
+    if [[ -n ${CORE_RA_DIR:-} && -f $CORE_RA_XML ]]; then
+        tmpdata=$($XMLLINT "$CORE_RA_XML" \
+            --xpath "files/file/@name" 2>/dev/null)
+        local -a ra_tags=(${${${${${${(@f)tmpdata}#*\"}%\"*}:#^*.(7z|zip|chd)}//\&amp;/&}})
+        unset tmpdata
+        for n in $ra_tags; do
+            (( ! ${all_tags[(Ie)$n]} )) && all_tags+=("$n")
+            GAME_SOURCE[$n]="ra"
+        done
+        log_info "zaparoo_mode: merged ${#ra_tags} RA entries for $zap_core"
+    fi
 
     if [[ -z $all_tags ]]; then
         log_error "zaparoo_mode: no games found in metadata for $zap_core"
@@ -1889,7 +2184,20 @@ zaparoo_mode () {
     [[ -d $dest_dir ]] || mkdir -p "$dest_dir"
 
     local dl_ok=false
-    case $CORE_BACKEND in
+    local tag_source=${GAME_SOURCE[$tag]:-$CORE_BACKEND}
+    log_info "zaparoo_mode: downloading '$filename' via $tag_source"
+    case $tag_source in
+        ra)
+            ra_download_rom "$tag" "$dest_dir" && dl_ok=true
+            # Fall back to primary backend on RA failure
+            if ! $dl_ok; then
+                log_warn "zaparoo_mode: RA failed, falling back to $CORE_BACKEND"
+                case $CORE_BACKEND in
+                    ni) ni_download_rom "$tag" "$dest_dir" && dl_ok=true ;;
+                    ia) ia_download_rom "$CORE_IA_IDENTIFIER" "$tag" "$dest_dir" && dl_ok=true ;;
+                esac
+            fi
+            ;;
         ni)
             ni_download_rom "$tag" "$dest_dir" && dl_ok=true
             ;;
@@ -1926,6 +2234,7 @@ main () {
     [[ -d $WRK_DIR      ]] || mkdir -p "$WRK_DIR"
     [[ -d $CACHE_DIR    ]] || mkdir -p "$CACHE_DIR"
     [[ -d $NI_CACHE_DIR ]] || mkdir -p "$NI_CACHE_DIR"
+    [[ -d $RA_CACHE_DIR ]] || mkdir -p "$RA_CACHE_DIR"
 
     pushd $WRK_DIR
     trap 'cleanup' $SIG_HUP $SIG_INT $SIG_QUIT $SIG_TERM
@@ -1999,11 +2308,13 @@ main () {
                     select_core $(<$DIALOG_TEMPFILE)
                     case $CORE_BACKEND in
                         ni)
+                            local ra_info=""
+                            [[ -n ${CORE_RA_DIR:-} ]] && ra_info="\nRA Set:  ${CORE_RA_DIR} (Minerva Archive)"
                             $DIALOG --title "Repository Info" --msgbox \
 "Core:    $CORE
 Backend: Internet Archive (ni-roms)
 System:  $CORE_NI_SYSTEM_ZIP
-Node:    $NI_NODE" 9 72 ;;
+Node:    $NI_NODE${ra_info}" $(( 9 + ( ${#ra_info} > 0 ? 1 : 0 ) )) 72 ;;
                         ia)
                             t=$($XMLLINT "$CORE_META_XML" \
                                 --xpath "string(metadata/title)" 2>/dev/null)
