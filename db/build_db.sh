@@ -20,6 +20,9 @@ TIMESTAMP=$(date +%s)
 GITHUB_USER="whill121980"
 REPO_NAME="retrarr"
 
+# Use current git branch to determine which branch the DB should point to
+BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "master")
+
 cat > "$DB_OUT" << EOF
 {
   "db_id": "retrarr",
@@ -28,7 +31,7 @@ cat > "$DB_OUT" << EOF
     "Scripts/retrarr.sh": {
       "hash": "${HASH}",
       "size": ${SIZE},
-      "url": "https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NAME}/master/retrarr.sh"
+      "url": "https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NAME}/${BRANCH}/retrarr.sh"
     }
   },
   "folders": {
