@@ -1147,7 +1147,9 @@ fetch_metadata () {
         esac
 
         # Also build RA catalog if this core has a Minerva RA directory
-        [[ -n ${RA_SYSTEM_DIR[$core]:-} ]] && build_ra_system_list $core
+        if [[ -n ${RA_SYSTEM_DIR[$core]:-} ]]; then
+            build_ra_system_list $core || true
+        fi
     done) | $DIALOG --title "$TITLE" --gauge \
         "Building ROM catalog..." 10 $(( $MAXWIDTH / 2 )) 0
 
