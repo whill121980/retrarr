@@ -1,11 +1,11 @@
 #!/bin/zsh
-# retrarr.sh — Retro Retriever v0.3.0-dev
+# retrarr.sh — Retro Retriever v0.3.1
 # Spiritual successor to MiSTer-ROMweasel by Koston-0xDEADBEEF
 #
 # Sources:
 #   No-Intro sets : archive.org/details/ni-roms  (view_archive.php streaming)
 #   CHD/disc sets : archive.org (ia download)
-#   RetroAchievements : minerva-archive.org (HTTP /rom endpoint, preferred)
+#   Minerva Archive   : minerva-archive.org (RA, No-Intro, Redump via BitTorrent)
 #
 # Requirements:
 #   - internetarchive CLI : pip3 install internetarchive
@@ -23,7 +23,7 @@ autoload zmv
 # ─── STATIC GLOBALS ────────────────────────────────────────────────────────────
 
 init_static_globals () {
-    typeset -gr RETRARR_VERSION="Retro Retriever v0.3.0-dev"
+    typeset -gr RETRARR_VERSION="Retro Retriever v0.3.1"
 
     # Required binaries
     typeset -gr XMLLINT=$(which xmllint)  || { print -u2 "ERROR: xmllint not found"  ; return 1 }
@@ -60,11 +60,13 @@ init_static_globals () {
     typeset -gr NI_FILES_XML="${WRK_DIR}/ni-roms_files.xml"
     typeset -gr NI_META_URL="https://archive.org/metadata/ni-roms"
 
-    # Minerva Archive — RetroAchievements verified ROM sets
-    # Downloads via BitTorrent (per-system torrent, selective file via aria2c)
+    # Minerva Archive — curated ROM sets via BitTorrent
+    # Downloads via per-system torrent, selective file via aria2c
     typeset -gr MINERVA_BASE_URL="https://minerva-archive.org"
+    typeset -gr MINERVA_TORRENT_PREFIX="Minerva_Myrient_v0.3"
     typeset -gr RA_CACHE_DIR="${WRK_DIR}/ra_cache"
-    typeset -gr RA_TORRENT_PREFIX="Minerva_Myrient_v0.3"
+    typeset -gr NI_MINERVA_CACHE_DIR="${WRK_DIR}/minerva_ni_cache"
+    typeset -gr REDUMP_CACHE_DIR="${WRK_DIR}/minerva_redump_cache"
 
     # Populated at runtime by init_ni_roms_node() and init_ia_cookie()
     typeset -g NI_NODE=""    # e.g. ia902803.us.archive.org
@@ -403,9 +405,68 @@ init_static_globals () {
         MSX       "RA - Microsoft MSX"
     )
 
-    # Global source tracking — maps game tag -> "ra" | "ni" | "ia"
-    # Populated by game_menu when building unified game lists
-    typeset -gA GAME_SOURCE=()
+    # ── Minerva No-Intro: system directory mappings ─────────────────────────
+    # Maps core IDs to Minerva No-Intro browse directory names.
+    typeset -gA NI_MINERVA_DIR=(
+        NES       "Nintendo - Nintendo Entertainment System (Headered)"
+        SNES      "Nintendo - Super Nintendo Entertainment System"
+        N64       "Nintendo - Nintendo 64 (BigEndian)"
+        GB        "Nintendo - Game Boy"
+        GBC       "Nintendo - Game Boy Color"
+        GBA       "Nintendo - Game Boy Advance"
+        POKEMINI  "Nintendo - Pokemon Mini"
+        A2600     "Atari - Atari 2600"
+        A5200     "Atari - Atari 5200"
+        A7800     "Atari - Atari 7800 (BIN)"
+        LYNX      "Atari - Atari Lynx (LNX)"
+        TG16      "NEC - PC Engine - TurboGrafx-16"
+        SGX       "NEC - PC Engine SuperGrafx"
+        SMS       "Sega - Master System - Mark III"
+        GG        "Sega - Game Gear"
+        SG1000    "Sega - SG-1000"
+        MD        "Sega - Mega Drive - Genesis"
+        S32X      "Sega - 32X"
+        NGP       "SNK - NeoGeo Pocket"
+        NGPC      "SNK - NeoGeo Pocket Color"
+        COLECO    "Coleco - ColecoVision"
+        VECTREX   "GCE - Vectrex"
+        ODYSSEY2  "Magnavox - Odyssey 2"
+        CHANNELF  "Fairchild - Channel F"
+        INTV      "Mattel - Intellivision"
+        ARCADIA   "Emerson - Arcadia 2001"
+        MEGADUCK  "Welback - Mega Duck"
+        WS        "Bandai - WonderSwan"
+        WSC       "Bandai - WonderSwan Color"
+        PV1000    "Casio - PV-1000"
+        ASTROCADE "Bally - Astrocade"
+        ADVISION  "Entex - Adventure Vision"
+        GAMATE    "Bit Corporation - Gamate"
+        SCV       "Epoch - Super Cassette Vision"
+        MSX       "Microsoft - MSX"
+        MSX2      "Microsoft - MSX2"
+        C64       "Commodore - Commodore 64"
+        VIC20     "Commodore - VIC-20"
+        C16       "Commodore - Plus-4"
+        ATARIST   "Atari - Atari ST"
+        ATARI800  "Atari - 8-bit Family"
+        RX78      "Bandai - Gundam RX-78"
+    )
+
+    # ── Minerva Redump: system directory mappings ─────────────────────────────
+    # Maps core IDs to Minerva Redump browse directory names (disc-based systems).
+    typeset -gA REDUMP_DIR=(
+        TG16CD    "NEC - PC Engine CD & TurboGrafx CD"
+        MCD       "Sega - Mega CD & Sega CD"
+        SS        "Sega - Saturn"
+        PSX       "Sony - PlayStation"
+        CD32      "Commodore - Amiga CD32"
+    )
+
+    # PSX Redump is a single unified set — all downloads go to /media/fat/games/PSX
+    typeset -gr PSX_REDUMP_GAMEDIR="/media/fat/games/PSX"
+
+    # Active source tracking — set by menu navigation path
+    typeset -g CORE_ACTIVE_SOURCE=""    # "ra" | "ni_minerva" | "redump" | "" (IA path)
 
     # ── Internet Archive backend: CHD/disc sets ────────────────────────────────
 
@@ -570,9 +631,41 @@ select_core () {
             ;;
     esac
 
-    # RA source — set if this core has a Minerva RetroAchievements directory
-    typeset -g CORE_RA_DIR="${RA_SYSTEM_DIR[$CORE]:-}"
-    typeset -g CORE_RA_XML="${RA_CACHE_DIR}/${CORE}_ra.xml"
+    typeset -g CORE_ACTIVE_SOURCE=""
+}
+
+# Set up core context for Minerva Archive paths.
+# Usage: select_minerva_core <core> <collection>
+#   collection: "ra" | "ni_minerva" | "redump"
+select_minerva_core () {
+    local core=$1 collection=$2
+    typeset -g CORE=$core
+    typeset -g CORE_BACKEND=""
+    typeset -g CORE_ACTIVE_SOURCE=$collection
+    typeset -g CORE_GAMEDIR=${(P)${:-${core}_GAMEDIR}:-${(P)${:-${core}_GAMEDIR_DEFAULT}}}
+
+    # PSX Redump is a unified set — override gamedir
+    [[ $collection == "redump" && $core == "PSX" ]] && \
+        typeset -g CORE_GAMEDIR="$PSX_REDUMP_GAMEDIR"
+
+    local cache_dir browse_dir
+    case $collection in
+        ra)
+            cache_dir="$RA_CACHE_DIR"
+            browse_dir="${RA_SYSTEM_DIR[$core]:-}"
+            ;;
+        ni_minerva)
+            cache_dir="$NI_MINERVA_CACHE_DIR"
+            browse_dir="${NI_MINERVA_DIR[$core]:-}"
+            ;;
+        redump)
+            cache_dir="$REDUMP_CACHE_DIR"
+            browse_dir="${REDUMP_DIR[$core]:-}"
+            ;;
+    esac
+
+    typeset -g CORE_FILES_XML="${cache_dir}/${core}_${collection}.xml"
+    typeset -g CORE_MINERVA_DIR="$browse_dir"
 }
 
 # ─── LOGGING ───────────────────────────────────────────────────────────────────
@@ -909,31 +1002,57 @@ PYEOF
     log_debug "build_ni_system_xml: $core result=$result"
 }
 
-# Build per-system game list by scraping Minerva RA browse page
-build_ra_system_list () {
-    local core=$1
-    local ra_dir=${RA_SYSTEM_DIR[$core]:-}
-    local out="${RA_CACHE_DIR}/${core}_ra.xml"
+# Build per-system game list by scraping a Minerva browse page.
+# Usage: build_minerva_system_list <collection> <core>
+#   collection: "ra" | "ni_minerva" | "redump"
+#   core: system key (NES, SNES, etc.)
+build_minerva_system_list () {
+    local collection=$1 core=$2
+    local browse_dir cache_dir browse_prefix
 
-    [[ -z $ra_dir ]] && return 1
-    [[ -f $out ]] && { log_info "build_ra_system_list: $core cached" ; return 0 }
-    log_info "build_ra_system_list: $core ($ra_dir)"
+    case $collection in
+        ra)
+            browse_dir=${RA_SYSTEM_DIR[$core]:-}
+            cache_dir="$RA_CACHE_DIR"
+            browse_prefix="RetroAchievements"
+            ;;
+        ni_minerva)
+            browse_dir=${NI_MINERVA_DIR[$core]:-}
+            cache_dir="$NI_MINERVA_CACHE_DIR"
+            browse_prefix="No-Intro"
+            ;;
+        redump)
+            browse_dir=${REDUMP_DIR[$core]:-}
+            cache_dir="$REDUMP_CACHE_DIR"
+            browse_prefix="Redump"
+            ;;
+        *) return 1 ;;
+    esac
 
-    local encoded_dir=$(urlencode "$ra_dir")
-    local url="${MINERVA_BASE_URL}/browse/RetroAchievements/${encoded_dir}/"
+    local out="${cache_dir}/${core}_${collection}.xml"
 
-    local py_tmp=$(mktemp /tmp/retrarr_ra_XXXXXX.py)
+    [[ -z $browse_dir ]] && return 1
+    [[ -f $out ]] && { log_info "build_minerva_system_list: $collection/$core cached" ; return 0 }
+    log_info "build_minerva_system_list: $collection/$core ($browse_dir)"
+
+    local encoded_dir=$(urlencode "$browse_dir")
+    local url="${MINERVA_BASE_URL}/browse/${browse_prefix}/${encoded_dir}/"
+
+    # Redump sets contain CHD/BIN+CUE in zip — match more extensions
+    local ext_pattern='zip'
+    [[ $collection == "redump" ]] && ext_pattern='(zip|chd|7z)'
+
+    local py_tmp=$(mktemp /tmp/retrarr_minerva_XXXXXX.py)
     cat > "$py_tmp" << PYEOF
 import sys, re, urllib.parse, html, os
 
 out_path = "${out}"
-ra_dir   = "${ra_dir}"
+dir_name = "${browse_dir}"
+ext_pat  = "${ext_pattern}"
 content  = sys.stdin.read()
 
-# Minerva browse pages: <a href="/rom?name=...">filename</a> ... <td>size</td>
-# Extract filenames from /rom?name= links
 link_re = re.compile(
-    r'href="/rom\?name=[^"]*%2F([^"]+\.zip)"',
+    r'href="/rom\?name=[^"]*%2F([^"]+\.' + ext_pat + r')"',
     re.IGNORECASE
 )
 size_re = re.compile(r'<span>\s*([\d.]+)\s*(B|KB|MB|GB)\s*</span>', re.IGNORECASE)
@@ -942,11 +1061,10 @@ links = link_re.findall(content)
 sizes = size_re.findall(content)
 
 if not links:
-    print(f'ERROR:no entries found for {ra_dir}', file=sys.stderr)
+    print(f'ERROR:no entries found for {dir_name}', file=sys.stderr)
     sys.exit(1)
 
 def parse_size(val, unit):
-    """Convert human-readable size to bytes."""
     v = float(val)
     mult = {'B': 1, 'KB': 1024, 'MB': 1048576, 'GB': 1073741824}
     return int(v * mult.get(unit.upper(), 1))
@@ -972,41 +1090,66 @@ PYEOF
     result=$($CURL "${CURL_OPTS[@]}" -sL "$url" 2>/dev/null | $PYTHON "$py_tmp" 2>>"$LOG_FILE")
 
     rm -f "$py_tmp"
-    log_debug "build_ra_system_list: $core result=$result"
+    log_debug "build_minerva_system_list: $collection/$core result=$result"
 }
 
-# Download a ROM via Minerva Archive BitTorrent (per-system torrent, selective file)
-ra_download_rom () {
-    local tag=$1       # bare game filename e.g. "Contra (USA).zip"
-    local dest_dir=$2
+# Download a ROM via Minerva Archive BitTorrent (per-system torrent, selective file).
+# Usage: minerva_download_rom <collection> <tag> <dest_dir>
+#   collection: "ra" | "ni_minerva" | "redump"
+#   tag: bare game filename e.g. "Contra (USA).zip"
+#   dest_dir: destination directory for extracted file
+minerva_download_rom () {
+    local collection=$1 tag=$2 dest_dir=$3
     local filename=${tag##*/}
+    local browse_dir cache_dir torrent_collection_name
+
+    case $collection in
+        ra)
+            browse_dir=${RA_SYSTEM_DIR[$CORE]:-}
+            cache_dir="$RA_CACHE_DIR"
+            torrent_collection_name="RetroAchievements"
+            ;;
+        ni_minerva)
+            browse_dir=${NI_MINERVA_DIR[$CORE]:-}
+            cache_dir="$NI_MINERVA_CACHE_DIR"
+            torrent_collection_name="No-Intro"
+            ;;
+        redump)
+            browse_dir=${REDUMP_DIR[$CORE]:-}
+            cache_dir="$REDUMP_CACHE_DIR"
+            torrent_collection_name="Redump"
+            ;;
+        *) log_error "minerva_download_rom: unknown collection '$collection'" ; return 1 ;;
+    esac
+
+    [[ -z $browse_dir ]] && { log_error "minerva_download_rom: no dir for $CORE in $collection" ; return 1 }
 
     # Require aria2c for torrent downloads
     if [[ -z $ARIA2C ]]; then
-        log_error "ra_download_rom: aria2c required for Minerva torrent downloads"
+        log_error "minerva_download_rom: aria2c required for Minerva torrent downloads"
         $DIALOG --title "$TITLE" --msgbox \
             "aria2c is required for Minerva Archive downloads.\n\nInstall it with: apt-get install aria2" 8 60
         return 1
     fi
 
-    log_info "ra_download_rom: $filename"
+    log_info "minerva_download_rom: $collection/$CORE/$filename"
 
     # Get/cache the per-system torrent file
-    local torrent_name="Minerva_Myrient - RetroAchievements - ${CORE_RA_DIR}.torrent"
-    local torrent_file="${RA_CACHE_DIR}/${CORE}_ra.torrent"
+    local torrent_name="Minerva_Myrient - ${torrent_collection_name} - ${browse_dir}.torrent"
+    local torrent_file="${cache_dir}/${CORE}_${collection}.torrent"
     if [[ ! -f $torrent_file ]]; then
         local encoded_name=$(urlencode "$torrent_name")
-        local torrent_url="${MINERVA_BASE_URL}/assets/${RA_TORRENT_PREFIX}/${encoded_name}"
-        log_info "ra_download_rom: fetching torrent from $torrent_url"
+        local torrent_url="${MINERVA_BASE_URL}/assets/${MINERVA_TORRENT_PREFIX}/${encoded_name}"
+        log_info "minerva_download_rom: fetching torrent from $torrent_url"
         $CURL "${CURL_OPTS[@]}" -sL "$torrent_url" -o "$torrent_file"
         if [[ ! -f $torrent_file || ! -s $torrent_file ]]; then
-            log_error "ra_download_rom: failed to download torrent file"
+            log_error "minerva_download_rom: failed to download torrent file"
             rm -f "$torrent_file"
             $DIALOG --title "$TITLE" --msgbox \
-                "Failed to download torrent for ${CORE_RA_DIR}.\n\nMinerva Archive may be unreachable." 8 60
+                "Failed to download torrent for ${browse_dir}.\n\nMinerva Archive may be unreachable." 8 60
             return 1
         fi
-        log_debug "ra_download_rom: torrent cached at $torrent_file"
+        log_debug "minerva_download_rom: torrent cached at $torrent_file"
     fi
 
     # Parse torrent to find file index for target game (aria2c uses 1-based indices)
@@ -1060,20 +1203,20 @@ PYEOF
 )
 
     if [[ -z $file_index || $file_index -eq 0 ]]; then
-        log_error "ra_download_rom: '$filename' not found in torrent index"
+        log_error "minerva_download_rom: '$filename' not found in torrent index"
         $DIALOG --title "$TITLE" --msgbox \
             "Could not find ${filename} in Minerva torrent.\n\nThe file may not be in this set." 8 60
         return 1
     fi
 
-    log_info "ra_download_rom: $filename -> torrent file index $file_index"
+    log_info "minerva_download_rom: $filename -> torrent file index $file_index"
 
     # Download via aria2c BitTorrent with selective file download
-    local bt_dir="${CACHE_DIR}/ra_bt"
+    local bt_dir="${CACHE_DIR}/minerva_bt"
     mkdir -p "$bt_dir"
 
     $DIALOG --title "Downloading: ${filename}" \
-        --infobox "Fetching from Minerva Archive via BitTorrent...\n\n${filename}\n(Finding peers...)" 8 72
+        --infobox "Fetching from Minerva Archive (${torrent_collection_name}) via BitTorrent...\n\n${filename}\n(Finding peers...)" 8 78
 
     $ARIA2C --select-file=$file_index \
         --dir="$bt_dir" \
@@ -1087,13 +1230,13 @@ PYEOF
         "$torrent_file" 2>>"$LOG_FILE"
 
     local aria_ret=$?
-    log_debug "ra_download_rom: aria2c exit=$aria_ret"
+    log_debug "minerva_download_rom: aria2c exit=$aria_ret"
 
     # Find the downloaded file in the nested torrent directory structure
-    # Torrent extracts to: bt_dir/Minerva_Myrient/RetroAchievements/RA - System/filename
+    # Torrent extracts to: bt_dir/Minerva_Myrient/<Collection>/<Dir>/filename
     local -a found_files=(${bt_dir}/**/${filename}(N))
     if [[ -z $found_files ]]; then
-        log_error "ra_download_rom: file not found after torrent download"
+        log_error "minerva_download_rom: file not found after torrent download"
         rm -rf "$bt_dir"
         $DIALOG --title "$TITLE" --msgbox \
             "Torrent download failed for:\n${filename}\n\nNo seeders may be available. Try again later." 9 60
@@ -1101,10 +1244,7 @@ PYEOF
     fi
 
     local ofile="${found_files[1]}"
-    log_debug "ra_download_rom: found at $ofile ($(wc -c < "$ofile" 2>/dev/null) bytes)"
-
-    # No size verification needed — BitTorrent piece hashes guarantee integrity.
-    # The catalog sizes are approximate (converted from rounded display values).
+    log_debug "minerva_download_rom: found at $ofile ($(wc -c < "$ofile" 2>/dev/null) bytes)"
 
     # Move only the target file to cache dir — discard any piece-boundary spillover
     mv "$ofile" "${CACHE_DIR}/${filename}"
@@ -1123,7 +1263,7 @@ PYEOF
         mv "$ofile" "$dest_dir"
     fi
 
-    log_info "ra_download_rom: complete -> $dest_dir"
+    log_info "minerva_download_rom: complete -> $dest_dir"
     return 0
 }
 
@@ -1162,20 +1302,21 @@ fetch_ia_metadata () {
 
 # Main metadata fetch — called once at startup
 fetch_metadata () {
-    local -a ni_cached ia_cached ra_cached
+    local -a ni_cached ia_cached minerva_cached
     ni_cached=($(print ${NI_CACHE_DIR}/*_files.xml(N)))
     ia_cached=($(print ${WRK_DIR}/chd_*(N) ${WRK_DIR}/0mhz*(N) ${WRK_DIR}/commodore*(N)))
-    ra_cached=($(print ${RA_CACHE_DIR}/*_ra.xml(N)))
+    minerva_cached=($(print ${RA_CACHE_DIR}/*.xml(N) \
+        ${NI_MINERVA_CACHE_DIR}/*.xml(N) ${REDUMP_CACHE_DIR}/*.xml(N)))
 
-    if [[ -f $NI_FILES_XML || -n $ni_cached || -n $ia_cached || -n $ra_cached ]]; then
+    if [[ -f $NI_FILES_XML || -n $ni_cached || -n $ia_cached || -n $minerva_cached ]]; then
         $DIALOG --title "$TITLE" --defaultno \
             --yesno "Re-download all ROM catalog metadata?\n\n(Only needed if catalogs have been updated)" 7 62
         if [[ $? -eq $DIALOG_OK ]]; then
-            rm -f $ni_cached $ia_cached $ra_cached "$NI_FILES_XML"
+            rm -f $ni_cached $ia_cached $minerva_cached "$NI_FILES_XML"
         fi
     fi
 
-    # Single ni-roms_files.xml covers all No-Intro systems
+    # Single ni-roms_files.xml covers all No-Intro systems (Internet Archive)
     fetch_ni_metadata
 
     (for (( i=1; i<${#SUPPORTED_CORES}; i+=2 )); do
@@ -1189,6 +1330,7 @@ fetch_metadata () {
 
         select_core $core
 
+        # Internet Archive metadata
         case $backend in
             ni)
                 build_ni_system_xml $core
@@ -1200,9 +1342,15 @@ fetch_metadata () {
                 ;;
         esac
 
-        # Also build RA catalog if this core has a Minerva RA directory
+        # Minerva catalogs (each collection independently)
         if [[ -n ${RA_SYSTEM_DIR[$core]:-} ]]; then
-            build_ra_system_list $core || true
+            build_minerva_system_list ra $core || true
+        fi
+        if [[ -n ${NI_MINERVA_DIR[$core]:-} ]]; then
+            build_minerva_system_list ni_minerva $core || true
+        fi
+        if [[ -n ${REDUMP_DIR[$core]:-} ]]; then
+            build_minerva_system_list redump $core || true
         fi
     done) | $DIALOG --title "$TITLE" --gauge \
         "Building ROM catalog..." 10 $(( $MAXWIDTH / 2 )) 0
@@ -1551,42 +1699,24 @@ download_roms () {
     fi
 
     local ok=0 fail=0
+    local active_source=${CORE_ACTIVE_SOURCE:-$CORE_BACKEND}
     for tag in $tags; do
         local dest
-        local tag_source=${GAME_SOURCE[$tag]:-$CORE_BACKEND}
-        log_debug "download_roms: tag='$tag' source=$tag_source backend=$CORE_BACKEND"
-        case $CORE_BACKEND in
-            ni)  dest="$CORE_GAMEDIR" ;;
-            ia)  dest=$(get_rom_gamedir "$tag") ;;
+        log_debug "download_roms: tag='$tag' source=$active_source"
+        case $active_source in
+            ra|ni_minerva|redump)  dest="$CORE_GAMEDIR" ;;
+            ni)                    dest="$CORE_GAMEDIR" ;;
+            ia)                    dest=$(get_rom_gamedir "$tag") ;;
         esac
-        # RA downloads go to same dest as the primary backend
-        [[ $tag_source == "ra" ]] && dest="$CORE_GAMEDIR"
         log_debug "download_roms: dest='$dest'"
         [[ -n $dest && ! -d $dest ]] && mkdir -p "$dest"
 
-        case $tag_source in
-            ra)
-                if ra_download_rom "$tag" "$dest"; then
+        case $active_source in
+            ra|ni_minerva|redump)
+                if minerva_download_rom "$active_source" "$tag" "$dest"; then
                     (( ++ok ))
                 else
-                    # Fall back to primary backend on RA failure
-                    log_warn "download_roms: RA failed for '$tag', falling back to $CORE_BACKEND"
-                    case $CORE_BACKEND in
-                        ni)
-                            if ni_download_rom "$tag" "$dest"; then
-                                (( ++ok ))
-                            else
-                                (( ++fail ))
-                            fi
-                            ;;
-                        ia)
-                            if ia_download_rom "$CORE_IA_IDENTIFIER" "$tag" "$dest"; then
-                                (( ++ok ))
-                            else
-                                (( ++fail ))
-                            fi
-                            ;;
-                    esac
+                    (( ++fail ))
                 fi
                 ;;
             ni)
@@ -1697,34 +1827,10 @@ game_menu () {
     local -i itemwidth retval i
     local filter tmpdata st rominfo sub match mbegin mend n
 
-    # Reset source tracking for this menu session
-    GAME_SOURCE=()
-
     tmpdata=$($XMLLINT "$CORE_FILES_XML" \
         --xpath "files/file/@name" 2>/dev/null)
     all_tags=(${${${${${${(@f)tmpdata}#*\"}%\"*}:#^*.(7z|zip|chd)}//\&amp;/&}})
     unset tmpdata
-
-    # Track source for primary backend tags
-    for n in $all_tags; do GAME_SOURCE[$n]="$CORE_BACKEND"; done
-
-    # Merge RA tags if available — RA preferred for duplicate filenames
-    if [[ -n $CORE_RA_DIR && -f $CORE_RA_XML ]]; then
-        tmpdata=$($XMLLINT "$CORE_RA_XML" \
-            --xpath "files/file/@name" 2>/dev/null)
-        local -a ra_tags=(${${${${${${(@f)tmpdata}#*\"}%\"*}:#^*.(7z|zip|chd)}//\&amp;/&}})
-        unset tmpdata
-
-        for n in $ra_tags; do
-            if (( ! ${all_tags[(Ie)$n]} )); then
-                # New game only in RA — add to list
-                all_tags+=("$n")
-            fi
-            # Mark as RA (overrides NI for duplicates — RA preferred)
-            GAME_SOURCE[$n]="ra"
-        done
-        log_info "game_menu: merged ${#ra_tags} RA entries for $CORE (total: ${#all_tags})"
-    fi
 
     if [[ -z $all_tags ]]; then
         $DIALOG --title "$TITLE" --msgbox \
@@ -1785,15 +1891,6 @@ game_menu () {
             (( ${selected_tags[(Ie)${menu_tags[$i]}]} )) && st="On" || st="0"
             $JOY_MODE && unset st
             local display=${${menu_tags[$i]##*/}%.(7z|zip|chd)}
-            # Prefix with source tag if RA source is available for this core
-            if [[ -n $CORE_RA_DIR && -f $CORE_RA_XML ]]; then
-                local src=${GAME_SOURCE[${menu_tags[$i]}]:-$CORE_BACKEND}
-                case $src in
-                    ra) display="[RA] ${display}" ;;
-                    ni) display="[NI] ${display}" ;;
-                    ia) display="[IA] ${display}" ;;
-                esac
-            fi
             menu_items+=(${menu_tags[$i]} ${display:0:$itemwidth} $st)
         done
 
@@ -2151,31 +2248,12 @@ zaparoo_mode () {
             ;;
     esac
 
-    # Also build RA catalog if available
-    [[ -n ${RA_SYSTEM_DIR[$zap_core]:-} ]] && build_ra_system_list $zap_core
-
-    # Search for matching game in XML — merge NI/IA and RA sources
-    GAME_SOURCE=()
+    # Search for matching game in XML (Internet Archive source only)
     local tmpdata
     tmpdata=$($XMLLINT "$CORE_FILES_XML" \
         --xpath "files/file/@name" 2>/dev/null)
     local -a all_tags=(${${${${${${(@f)tmpdata}#*\"}%\"*}:#^*.(7z|zip|chd)}//\&amp;/&}})
     unset tmpdata
-    local n
-    for n in $all_tags; do GAME_SOURCE[$n]="$CORE_BACKEND"; done
-
-    # Merge RA tags — RA preferred for duplicates
-    if [[ -n ${CORE_RA_DIR:-} && -f $CORE_RA_XML ]]; then
-        tmpdata=$($XMLLINT "$CORE_RA_XML" \
-            --xpath "files/file/@name" 2>/dev/null)
-        local -a ra_tags=(${${${${${${(@f)tmpdata}#*\"}%\"*}:#^*.(7z|zip|chd)}//\&amp;/&}})
-        unset tmpdata
-        for n in $ra_tags; do
-            (( ! ${all_tags[(Ie)$n]} )) && all_tags+=("$n")
-            GAME_SOURCE[$n]="ra"
-        done
-        log_info "zaparoo_mode: merged ${#ra_tags} RA entries for $zap_core"
-    fi
 
     if [[ -z $all_tags ]]; then
         log_error "zaparoo_mode: no games found in metadata for $zap_core"
@@ -2240,20 +2318,8 @@ zaparoo_mode () {
     [[ -d $dest_dir ]] || mkdir -p "$dest_dir"
 
     local dl_ok=false
-    local tag_source=${GAME_SOURCE[$tag]:-$CORE_BACKEND}
-    log_info "zaparoo_mode: downloading '$filename' via $tag_source"
-    case $tag_source in
-        ra)
-            ra_download_rom "$tag" "$dest_dir" && dl_ok=true
-            # Fall back to primary backend on RA failure
-            if ! $dl_ok; then
-                log_warn "zaparoo_mode: RA failed, falling back to $CORE_BACKEND"
-                case $CORE_BACKEND in
-                    ni) ni_download_rom "$tag" "$dest_dir" && dl_ok=true ;;
-                    ia) ia_download_rom "$CORE_IA_IDENTIFIER" "$tag" "$dest_dir" && dl_ok=true ;;
-                esac
-            fi
-            ;;
+    log_info "zaparoo_mode: downloading '$filename' via $CORE_BACKEND"
+    case $CORE_BACKEND in
         ni)
             ni_download_rom "$tag" "$dest_dir" && dl_ok=true
             ;;
@@ -2287,10 +2353,12 @@ main () {
 
     init_static_globals
 
-    [[ -d $WRK_DIR      ]] || mkdir -p "$WRK_DIR"
-    [[ -d $CACHE_DIR    ]] || mkdir -p "$CACHE_DIR"
-    [[ -d $NI_CACHE_DIR ]] || mkdir -p "$NI_CACHE_DIR"
-    [[ -d $RA_CACHE_DIR ]] || mkdir -p "$RA_CACHE_DIR"
+    [[ -d $WRK_DIR              ]] || mkdir -p "$WRK_DIR"
+    [[ -d $CACHE_DIR            ]] || mkdir -p "$CACHE_DIR"
+    [[ -d $NI_CACHE_DIR         ]] || mkdir -p "$NI_CACHE_DIR"
+    [[ -d $RA_CACHE_DIR         ]] || mkdir -p "$RA_CACHE_DIR"
+    [[ -d $NI_MINERVA_CACHE_DIR ]] || mkdir -p "$NI_MINERVA_CACHE_DIR"
+    [[ -d $REDUMP_CACHE_DIR     ]] || mkdir -p "$REDUMP_CACHE_DIR"
 
     pushd $WRK_DIR
     trap 'cleanup' $SIG_HUP $SIG_INT $SIG_QUIT $SIG_TERM
@@ -2323,12 +2391,12 @@ main () {
         $JOY_MODE && jm=" (Simple Mode)" || unset jm
         typeset -g TITLE="${RETRARR_VERSION}${jm}"
 
-        # ── Top-level: Console / Computer ──
+        # ── Level 1: Source picker ──
         $DIALOG --title "$TITLE" --cancel-label "Quit" \
             --help-button --help-label "Settings" \
-            --menu "Choose a category:" 0 50 0 \
-            "Consoles"  "Cartridge & disc-based systems (${$(( ${#CONSOLE_CORES} / 2 ))} systems)" \
-            "Computers" "Home computers & DOS (${$(( ${#COMPUTER_CORES} / 2 ))} systems)" \
+            --menu "Choose a source:" 0 64 0 \
+            "Minerva"   "Minerva Archive (RA, No-Intro, Redump)" \
+            "IA"        "Internet Archive (ni-roms, CHD collections)" \
             2>$DIALOG_TEMPFILE
 
         retval=$?
@@ -2338,56 +2406,149 @@ main () {
             *)            break ;;
         esac
 
-        local category=$(<$DIALOG_TEMPFILE)
-        local -a core_list
-        case $category in
-            Consoles)  core_list=( $CONSOLE_CORES )  ;;
-            Computers) core_list=( $COMPUTER_CORES ) ;;
-        esac
+        local source_choice=$(<$DIALOG_TEMPFILE)
 
-        # ── Second level: system picker ──
-        while true; do
-            local default_item=${CORE:-0}
+        case $source_choice in
+        Minerva)
+            # ── Level 2: Minerva collection picker ──
+            while true; do
+                $DIALOG --title "$TITLE — Minerva Archive" --cancel-label "Back" \
+                    --menu "Choose a collection:" 0 64 0 \
+                    "ra"          "RetroAchievements (hash-verified ROMs)" \
+                    "ni_minerva"  "No-Intro (dat-verified dumps)" \
+                    "redump"      "Redump (disc images)" \
+                    2>$DIALOG_TEMPFILE
 
-            $DIALOG --title "$TITLE — $category" --cancel-label "Back" \
-                --extra-button --extra-label "Info" \
-                --default-item "$default_item" \
-                --menu "Choose target system / repository:" 0 80 0 \
-                $core_list 2>$DIALOG_TEMPFILE
+                retval=$?
+                [[ $retval -ne $DIALOG_OK ]] && break
 
-            retval=$?
-            case $retval in
-                $DIALOG_OK)
-                    select_core $(<$DIALOG_TEMPFILE)
-                    game_menu ;;
-                $DIALOG_EXTRA)
-                    select_core $(<$DIALOG_TEMPFILE)
-                    case $CORE_BACKEND in
-                        ni)
-                            local ra_info=""
-                            [[ -n ${CORE_RA_DIR:-} ]] && ra_info="\nRA Set:  ${CORE_RA_DIR} (Minerva Archive)"
-                            $DIALOG --title "Repository Info" --msgbox \
+                local minerva_collection=$(<$DIALOG_TEMPFILE)
+
+                # Build system list for this collection
+                local -a minerva_core_list=()
+                local -A collection_dir_map
+                case $minerva_collection in
+                    ra)          collection_dir_map=("${(@kv)RA_SYSTEM_DIR}") ;;
+                    ni_minerva)  collection_dir_map=("${(@kv)NI_MINERVA_DIR}") ;;
+                    redump)      collection_dir_map=("${(@kv)REDUMP_DIR}") ;;
+                esac
+
+                local ckey cname
+                # Match against SUPPORTED_CORES to get display names
+                for (( i=1; i<${#SUPPORTED_CORES}; i+=2 )); do
+                    ckey=${SUPPORTED_CORES[i]}
+                    cname=${SUPPORTED_CORES[$(( i+1 ))]}
+                    [[ -n ${collection_dir_map[$ckey]:-} ]] && \
+                        minerva_core_list+=("$ckey" "$cname")
+                done
+                # PSX Redump is a unified set not in SUPPORTED_CORES (IA uses split regions)
+                if [[ $minerva_collection == "redump" && -n ${collection_dir_map[PSX]:-} ]]; then
+                    minerva_core_list+=("PSX" "Sony PlayStation (all regions)")
+                fi
+
+                if [[ ${#minerva_core_list} -eq 0 ]]; then
+                    $DIALOG --title "$TITLE" --msgbox \
+                        "No systems available for this collection." 6 50
+                    continue
+                fi
+
+                local collection_label
+                case $minerva_collection in
+                    ra)          collection_label="RetroAchievements" ;;
+                    ni_minerva)  collection_label="No-Intro" ;;
+                    redump)      collection_label="Redump" ;;
+                esac
+
+                # ── Level 3: Minerva system picker ──
+                while true; do
+                    local default_item=${CORE:-0}
+
+                    $DIALOG --title "$TITLE — Minerva — $collection_label" \
+                        --cancel-label "Back" \
+                        --default-item "$default_item" \
+                        --menu "Choose target system:" 0 80 0 \
+                        $minerva_core_list 2>$DIALOG_TEMPFILE
+
+                    retval=$?
+                    [[ $retval -ne $DIALOG_OK ]] && break
+
+                    select_minerva_core $(<$DIALOG_TEMPFILE) $minerva_collection
+
+                    # Lazy catalog build — fetch on first access if not cached
+                    if [[ ! -f $CORE_FILES_XML ]]; then
+                        $DIALOG --title "$TITLE" --infobox \
+                            "Fetching game catalog for ${CORE}..." 4 50
+                        build_minerva_system_list $minerva_collection $CORE
+                    fi
+
+                    game_menu
+                done
+            done
+            ;;
+        IA)
+            # ── Level 2: Internet Archive — Console / Computer ──
+            while true; do
+                $DIALOG --title "$TITLE — Internet Archive" --cancel-label "Back" \
+                    --menu "Choose a category:" 0 50 0 \
+                    "Consoles"  "Cartridge & disc-based systems (${$(( ${#CONSOLE_CORES} / 2 ))} systems)" \
+                    "Computers" "Home computers & DOS (${$(( ${#COMPUTER_CORES} / 2 ))} systems)" \
+                    2>$DIALOG_TEMPFILE
+
+                retval=$?
+                [[ $retval -ne $DIALOG_OK ]] && break
+
+                local category=$(<$DIALOG_TEMPFILE)
+                local -a core_list
+                case $category in
+                    Consoles)  core_list=( $CONSOLE_CORES )  ;;
+                    Computers) core_list=( $COMPUTER_CORES ) ;;
+                esac
+
+                # ── Level 3: IA system picker ──
+                while true; do
+                    local default_item=${CORE:-0}
+
+                    $DIALOG --title "$TITLE — Internet Archive — $category" \
+                        --cancel-label "Back" \
+                        --extra-button --extra-label "Info" \
+                        --default-item "$default_item" \
+                        --menu "Choose target system / repository:" 0 80 0 \
+                        $core_list 2>$DIALOG_TEMPFILE
+
+                    retval=$?
+                    case $retval in
+                        $DIALOG_OK)
+                            select_core $(<$DIALOG_TEMPFILE)
+                            game_menu ;;
+                        $DIALOG_EXTRA)
+                            select_core $(<$DIALOG_TEMPFILE)
+                            case $CORE_BACKEND in
+                                ni)
+                                    $DIALOG --title "Repository Info" --msgbox \
 "Core:    $CORE
 Backend: Internet Archive (ni-roms)
 System:  $CORE_NI_SYSTEM_ZIP
-Node:    $NI_NODE${ra_info}" $(( 9 + ( ${#ra_info} > 0 ? 1 : 0 ) )) 72 ;;
-                        ia)
-                            t=$($XMLLINT "$CORE_META_XML" \
-                                --xpath "string(metadata/title)" 2>/dev/null)
-                            d=$($XMLLINT "$CORE_META_XML" \
-                                --xpath "string(metadata/addeddate)" 2>/dev/null)
-                            $DIALOG --title "Repository Info" --msgbox \
+Node:    $NI_NODE" 9 72 ;;
+                                ia)
+                                    t=$($XMLLINT "$CORE_META_XML" \
+                                        --xpath "string(metadata/title)" 2>/dev/null)
+                                    d=$($XMLLINT "$CORE_META_XML" \
+                                        --xpath "string(metadata/addeddate)" 2>/dev/null)
+                                    $DIALOG --title "Repository Info" --msgbox \
 "Core:    $CORE
 Backend: Internet Archive (ia download)
 ID:      $CORE_IA_IDENTIFIER
 Title:   $t
 Added:   $d" 11 72 ;;
+                            esac
+                            unset t d ;;
+                        *)
+                            break ;;
                     esac
-                    unset t d ;;
-                *)
-                    break ;;
-            esac
-        done
+                done
+            done
+            ;;
+        esac
     done
 
     cleanup
