@@ -10,10 +10,10 @@ MiSTer-ROMweasel's archive.org identifiers (`nointro.snes`, etc.) went dark. Myr
 
 ## Features
 
-- **33 supported systems** across Nintendo, Atari, NEC, Sega, Sony, and more
+- **52 supported systems** across Nintendo, Atari, NEC, Sega, SNK, Sony, Commodore, and more
 - **Two download backends:**
   - `ni` -- No-Intro ROM sets via archive.org `ni-roms` (zip streaming through `view_archive.php`)
-  - `ia` -- CHD/disc images via `ia download` CLI (PlayStation, Saturn, Sega CD, TG16-CD, AO486, CD32)
+  - `ia` -- CHD/disc images via `ia download` CLI (PlayStation, Saturn, Mega CD, TG16-CD, AO486, CD32)
 - **SHA1 verification** of every download against archive.org metadata
 - **Encrypted credentials** -- archive.org login stored with AES-256-CBC, keyed to your device
 - **Leveled logging** -- `error` / `warn` / `info` / `debug` with automatic rotation
@@ -26,12 +26,16 @@ MiSTer-ROMweasel's archive.org identifiers (`nointro.snes`, etc.) went dark. Myr
 
 | Manufacturer | Systems |
 |---|---|
-| Nintendo | NES, SNES, N64, Game Boy, Game Boy Color, Game Boy Advance |
-| Atari | 2600, 5200, 7800, Lynx |
+| Nintendo | NES, SNES, N64, Game Boy, Game Boy Color, Game Boy Advance, Pokemon Mini |
+| Atari | 2600, 5200, 7800, Lynx, 800/XL/XE, ST |
 | NEC | TurboGrafx-16 / PC Engine, TurboGrafx-CD / PC Engine CD, SuperGrafx |
-| Sega | Master System, Game Gear, SG-1000, Mega Drive / Genesis, Mega CD / Sega CD, Saturn |
+| Sega | Master System, Game Gear, SG-1000, Mega Drive / Genesis, 32X, Mega CD / Sega CD, Saturn |
+| SNK | Neo Geo Pocket, Neo Geo Pocket Color |
 | Sony | PlayStation (USA, Europe, Japan, Japan #2, Miscellaneous) |
-| Other | ColecoVision, Vectrex, Odyssey 2, Channel F, WonderSwan, WonderSwan Color, PV-1000, AO486 (0MHz DOS), Amiga CD32 |
+| Commodore | 64, VIC-20, 16 / Plus-4 |
+| Microsoft | MSX, MSX2 |
+| Bandai | RX-78 Gundam |
+| Other | Intellivision, ColecoVision, Vectrex, Odyssey 2, Channel F, WonderSwan, WonderSwan Color, PV-1000, Bally Astrocade, Emerson Arcadia 2001, Adventure Vision, Bit Corp Gamate, Mega Duck, Epoch Super Cassette Vision, AO486 (0MHz DOS), Amiga CD32 |
 
 ## Requirements
 

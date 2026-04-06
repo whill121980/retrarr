@@ -102,41 +102,69 @@ init_static_globals () {
     fi
 
     # ── Supported cores ────────────────────────────────────────────────────────
-    typeset -gra SUPPORTED_CORES=( \
-        "NES"      "Nintendo Entertainment System"       \
-        "SNES"     "Super Nintendo"                      \
-        "N64"      "Nintendo 64"                         \
-        "GB"       "Nintendo GameBoy"                    \
-        "GBC"      "Nintendo GameBoy Color"              \
-        "GBA"      "GameBoy Advance"                     \
-        "A2600"    "Atari 2600"                          \
-        "A5200"    "Atari 5200"                          \
-        "A7800"    "Atari 7800"                          \
-        "LYNX"     "Atari Lynx"                          \
-        "TG16"     "NEC TurboGrafx-16 / PC-Engine"       \
-        "TG16CD"   "NEC TurboGrafx-CD / PC-Engine CD"    \
-        "SGX"      "NEC SuperGrafx"                      \
-        "SMS"      "SEGA Master System"                  \
-        "GG"       "SEGA Game Gear"                      \
-        "SG1000"   "SEGA SG-1000"                        \
-        "MD"       "SEGA Mega Drive"                     \
-        "MCD"      "SEGA MegaCD / SegaCD"                \
-        "SS"       "SEGA Saturn"                         \
-        "PSXUS"    "Sony PlayStation USA"                \
-        "PSXEU"    "Sony PlayStation Europe"             \
-        "PSXJP"    "Sony PlayStation Japan"              \
-        "PSXJP2"   "Sony PlayStation Japan \#2"          \
-        "PSXMISC"  "Sony PlayStation Miscellaneous"      \
-        "COLECO"   "ColecoVision"                        \
-        "VECTREX"  "GCE Vectrex"                         \
-        "ODYSSEY2" "Magnavox Odyssey 2"                  \
-        "CHANNELF" "Fairchild Channel F"                 \
-        "WS"       "WonderSwan"                          \
-        "WSC"      "WonderSwan Color"                    \
-        "PV1000"   "Casio PV-1000"                       \
-        "AO486"    "0MHz DOS Collection"                 \
-        "CD32"     "Amiga CD32"                          \
+    # SUPPORTED_CORES is the union of consoles + computers (used by
+    # fetch_metadata, Zaparoo validation, etc.).  The two sub-arrays drive
+    # the top-level Console / Computer menu split.
+
+    typeset -gra CONSOLE_CORES=( \
+        "NES"        "Nintendo Entertainment System"       \
+        "SNES"       "Super Nintendo"                      \
+        "N64"        "Nintendo 64"                         \
+        "GB"         "Nintendo GameBoy"                    \
+        "GBC"        "Nintendo GameBoy Color"              \
+        "GBA"        "GameBoy Advance"                     \
+        "POKEMINI"   "Nintendo Pokemon Mini"               \
+        "A2600"      "Atari 2600"                          \
+        "A5200"      "Atari 5200"                          \
+        "A7800"      "Atari 7800"                          \
+        "LYNX"       "Atari Lynx"                          \
+        "TG16"       "NEC TurboGrafx-16 / PC-Engine"       \
+        "TG16CD"     "NEC TurboGrafx-CD / PC-Engine CD"    \
+        "SGX"        "NEC SuperGrafx"                      \
+        "SMS"        "SEGA Master System"                  \
+        "GG"         "SEGA Game Gear"                      \
+        "SG1000"     "SEGA SG-1000"                        \
+        "MD"         "SEGA Mega Drive"                     \
+        "S32X"       "SEGA 32X"                            \
+        "MCD"        "SEGA MegaCD / SegaCD"                \
+        "SS"         "SEGA Saturn"                         \
+        "NGP"        "SNK Neo Geo Pocket"                  \
+        "NGPC"       "SNK Neo Geo Pocket Color"            \
+        "PSXUS"      "Sony PlayStation USA"                \
+        "PSXEU"      "Sony PlayStation Europe"             \
+        "PSXJP"      "Sony PlayStation Japan"              \
+        "PSXJP2"     "Sony PlayStation Japan \#2"          \
+        "PSXMISC"    "Sony PlayStation Miscellaneous"      \
+        "INTV"       "Mattel Intellivision"                \
+        "COLECO"     "ColecoVision"                        \
+        "VECTREX"    "GCE Vectrex"                         \
+        "ODYSSEY2"   "Magnavox Odyssey 2"                  \
+        "CHANNELF"   "Fairchild Channel F"                 \
+        "WS"         "WonderSwan"                          \
+        "WSC"        "WonderSwan Color"                    \
+        "PV1000"     "Casio PV-1000"                       \
+        "ASTROCADE"  "Bally Astrocade"                     \
+        "ARCADIA"    "Emerson Arcadia 2001"                \
+        "ADVISION"   "Entex Adventure Vision"              \
+        "GAMATE"     "Bit Corporation Gamate"              \
+        "MEGADUCK"   "Welback Mega Duck"                   \
+        "SCV"        "Epoch Super Cassette Vision"         \
     )
+
+    typeset -gra COMPUTER_CORES=( \
+        "C64"        "Commodore 64"                        \
+        "VIC20"      "Commodore VIC-20"                    \
+        "C16"        "Commodore 16 / Plus-4"               \
+        "MSX"        "Microsoft MSX"                       \
+        "MSX2"       "Microsoft MSX2"                      \
+        "ATARIST"    "Atari ST"                            \
+        "ATARI800"   "Atari 800 / XL / XE"                 \
+        "RX78"       "Bandai RX-78 Gundam"                 \
+        "AO486"      "0MHz DOS Collection"                 \
+        "CD32"       "Amiga CD32"                          \
+    )
+
+    typeset -gra SUPPORTED_CORES=( $CONSOLE_CORES $COMPUTER_CORES )
 
     # ── ni-roms backend: No-Intro sets ─────────────────────────────────────────
     # NI_SYSTEM_ZIP = the zip filename within ni-roms/roms/
@@ -241,6 +269,94 @@ init_static_globals () {
     typeset -gr CHANNELF_BACKEND="ni"
     typeset -gr CHANNELF_NI_SYSTEM_ZIP="Fairchild - Channel F.zip"
     typeset -gr CHANNELF_GAMEDIR_DEFAULT="/media/fat/games/ChannelF"
+
+    # ── Commodore ──
+
+    typeset -gr C64_BACKEND="ni"
+    typeset -gr C64_NI_SYSTEM_ZIP="Commodore - Commodore 64.zip"
+    typeset -gr C64_GAMEDIR_DEFAULT="/media/fat/games/C64"
+
+    typeset -gr VIC20_BACKEND="ni"
+    typeset -gr VIC20_NI_SYSTEM_ZIP="Commodore - VIC-20.zip"
+    typeset -gr VIC20_GAMEDIR_DEFAULT="/media/fat/games/VIC20"
+
+    typeset -gr C16_BACKEND="ni"
+    typeset -gr C16_NI_SYSTEM_ZIP="Commodore - Plus-4.zip"
+    typeset -gr C16_GAMEDIR_DEFAULT="/media/fat/games/C16"
+
+    # ── Microsoft ──
+
+    typeset -gr MSX_BACKEND="ni"
+    typeset -gr MSX_NI_SYSTEM_ZIP="Microsoft - MSX.zip"
+    typeset -gr MSX_GAMEDIR_DEFAULT="/media/fat/games/MSX"
+
+    typeset -gr MSX2_BACKEND="ni"
+    typeset -gr MSX2_NI_SYSTEM_ZIP="Microsoft - MSX2.zip"
+    typeset -gr MSX2_GAMEDIR_DEFAULT="/media/fat/games/MSX"
+
+    # ── Atari (computer) ──
+
+    typeset -gr ATARIST_BACKEND="ni"
+    typeset -gr ATARIST_NI_SYSTEM_ZIP="Atari - ST.zip"
+    typeset -gr ATARIST_GAMEDIR_DEFAULT="/media/fat/games/AtariST"
+
+    typeset -gr ATARI800_BACKEND="ni"
+    typeset -gr ATARI800_NI_SYSTEM_ZIP="Atari - 8-bit Family.zip"
+    typeset -gr ATARI800_GAMEDIR_DEFAULT="/media/fat/games/ATARI800"
+
+    # ── Intellivision ──
+
+    typeset -gr INTV_BACKEND="ni"
+    typeset -gr INTV_NI_SYSTEM_ZIP="Mattel - Intellivision.zip"
+    typeset -gr INTV_GAMEDIR_DEFAULT="/media/fat/games/Intellivision"
+
+    # ── Additional consoles ──
+
+    typeset -gr S32X_BACKEND="ni"
+    typeset -gr S32X_NI_SYSTEM_ZIP="Sega - 32X.zip"
+    typeset -gr S32X_GAMEDIR_DEFAULT="/media/fat/games/S32X"
+
+    typeset -gr POKEMINI_BACKEND="ni"
+    typeset -gr POKEMINI_NI_SYSTEM_ZIP="Nintendo - Pokemon Mini.zip"
+    typeset -gr POKEMINI_GAMEDIR_DEFAULT="/media/fat/games/PokemonMini"
+
+    typeset -gr ASTROCADE_BACKEND="ni"
+    typeset -gr ASTROCADE_NI_SYSTEM_ZIP="Bally - Astrocade.zip"
+    typeset -gr ASTROCADE_GAMEDIR_DEFAULT="/media/fat/games/Astrocade"
+
+    typeset -gr ARCADIA_BACKEND="ni"
+    typeset -gr ARCADIA_NI_SYSTEM_ZIP="Emerson - Arcadia 2001.zip"
+    typeset -gr ARCADIA_GAMEDIR_DEFAULT="/media/fat/games/Arcadia"
+
+    typeset -gr GAMATE_BACKEND="ni"
+    typeset -gr GAMATE_NI_SYSTEM_ZIP="Bit Corporation - Gamate.zip"
+    typeset -gr GAMATE_GAMEDIR_DEFAULT="/media/fat/games/Gamate"
+
+    typeset -gr MEGADUCK_BACKEND="ni"
+    typeset -gr MEGADUCK_NI_SYSTEM_ZIP="Welback - Mega Duck.zip"
+    typeset -gr MEGADUCK_GAMEDIR_DEFAULT="/media/fat/games/MegaDuck"
+
+    typeset -gr SCV_BACKEND="ni"
+    typeset -gr SCV_NI_SYSTEM_ZIP="Epoch - Super Cassette Vision.zip"
+    typeset -gr SCV_GAMEDIR_DEFAULT="/media/fat/games/SCV"
+
+    typeset -gr ADVISION_BACKEND="ni"
+    typeset -gr ADVISION_NI_SYSTEM_ZIP="Entex - Adventure Vision.zip"
+    typeset -gr ADVISION_GAMEDIR_DEFAULT="/media/fat/games/AVision"
+
+    typeset -gr NGP_BACKEND="ni"
+    typeset -gr NGP_NI_SYSTEM_ZIP="SNK - NeoGeo Pocket.zip"
+    typeset -gr NGP_GAMEDIR_DEFAULT="/media/fat/games/NeoGeoPocket"
+
+    typeset -gr NGPC_BACKEND="ni"
+    typeset -gr NGPC_NI_SYSTEM_ZIP="SNK - NeoGeo Pocket Color.zip"
+    typeset -gr NGPC_GAMEDIR_DEFAULT="/media/fat/games/NeoGeoPocket"
+
+    # ── Additional computers ──
+
+    typeset -gr RX78_BACKEND="ni"
+    typeset -gr RX78_NI_SYSTEM_ZIP="Bandai - Gundam RX-78.zip"
+    typeset -gr RX78_GAMEDIR_DEFAULT="/media/fat/games/RX-78"
 
     # Neo Geo — DEFERRED: MiSTer core requires decrypted .neo files
     # ni-roms No-Intro sets are encrypted MAME format (incompatible)
@@ -707,7 +823,7 @@ system_zip = "${system_zip}"
 content    = sys.stdin.read()
 
 href_re = re.compile(
-    r'href="//archive\.org/download/ni-roms/roms/[^"]+/([^"]+\.(?:zip|7z|nes|sfc|smc|gb|gbc|gba|n64|z64|v64|md|gen|sms|gg|pce|ws|wsc|rom))"',
+    r'href="//archive\.org/download/ni-roms/roms/[^"]+/([^"]+\.(?:zip|7z|nes|sfc|smc|gb|gbc|gba|n64|z64|v64|md|gen|sms|gg|pce|ws|wsc|rom|bin|crt|d64|prg|t64|mx1|mx2|st|stx|a52|car|atr|xex|int|32x|min|sv|ngp|ngc|adf))"',
     re.IGNORECASE
 )
 size_re = re.compile(r'<td id="size">(\d+)')
@@ -1529,24 +1645,30 @@ settings_dirs () {
     groups=(Nintendo Atari NEC Sega Sony Other)
 
     local -A group_cores
-    group_cores[Nintendo]="NES SNES N64 GB GBC GBA"
-    group_cores[Atari]="A2600 A5200 A7800 LYNX"
+    group_cores[Nintendo]="NES SNES N64 GB GBC GBA POKEMINI"
+    group_cores[Atari]="A2600 A5200 A7800 LYNX ATARI800 ATARIST"
     group_cores[NEC]="TG16 TG16CD SGX"
-    group_cores[Sega]="SMS GG SG1000 MD MCD SS"
+    group_cores[Sega]="SMS GG SG1000 MD S32X MCD SS"
+    group_cores[SNK]="NGP NGPC"
     group_cores[Sony]="PSXUS PSXEU PSXJP PSXJP2 PSXMISC"
-    group_cores[Other]="COLECO VECTREX ODYSSEY2 CHANNELF WS WSC PV1000 AO486 CD32"
+    group_cores[Commodore]="C64 VIC20 C16"
+    group_cores[Microsoft]="MSX MSX2"
+    group_cores[Other]="INTV COLECO VECTREX ODYSSEY2 CHANNELF WS WSC PV1000 ASTROCADE ARCADIA ADVISION GAMATE MEGADUCK SCV RX78 AO486 CD32"
 
     while true; do
         $DIALOG --title "Game Directories" \
             --cancel-label "Back" \
             --menu "Select manufacturer group to configure:" \
             0 0 0 \
-            "Nintendo" "NES, SNES, N64, GB, GBC, GBA"              \
-            "Atari"    "2600, 5200, 7800, Lynx"                     \
-            "NEC"      "TG-16, TG-CD, SuperGrafx"                   \
-            "Sega"     "SMS, GG, SG-1000, MD, MegaCD, Saturn"       \
-            "Sony"     "PlayStation (USA/EUR/JPN)"                   \
-            "Other"    "Coleco, Vectrex, Odyssey, Channel F, WS..." \
+            "Nintendo"  "NES, SNES, N64, GB, GBC, GBA, Pokemon Mini" \
+            "Atari"     "2600, 5200, 7800, Lynx, 800/XL/XE, ST"    \
+            "NEC"       "TG-16, TG-CD, SuperGrafx"                  \
+            "Sega"      "SMS, GG, SG-1000, MD, 32X, MegaCD, Saturn" \
+            "SNK"       "Neo Geo Pocket, Neo Geo Pocket Color"      \
+            "Sony"      "PlayStation (USA/EUR/JPN)"                  \
+            "Commodore" "C64, VIC-20, C16/Plus-4"                   \
+            "Microsoft" "MSX, MSX2"                                 \
+            "Other"     "Intellivision, Coleco, Vectrex, more..."   \
             2>$DIALOG_TEMPFILE
         retval=$?
         [[ $retval -ne $DIALOG_OK ]] && break
@@ -1833,49 +1955,72 @@ main () {
     fetch_metadata
 
     while true; do
-        local default_item=${CORE:-0}
         $JOY_MODE && jm=" (Simple Mode)" || unset jm
         typeset -g TITLE="${RETRARR_VERSION}${jm}"
 
+        # ── Top-level: Console / Computer ──
         $DIALOG --title "$TITLE" --cancel-label "Quit" \
             --help-button --help-label "Settings" \
-            --extra-button --extra-label "Info" \
-            --default-item "$default_item" \
-            --menu "Choose target system / repository:" 0 80 0 \
-            $SUPPORTED_CORES 2>$DIALOG_TEMPFILE
+            --menu "Choose a category:" 0 50 0 \
+            "Consoles"  "Cartridge & disc-based systems (${$(( ${#CONSOLE_CORES} / 2 ))} systems)" \
+            "Computers" "Home computers & DOS (${$(( ${#COMPUTER_CORES} / 2 ))} systems)" \
+            2>$DIALOG_TEMPFILE
 
         retval=$?
         case $retval in
-            $DIALOG_OK)
-                select_core $(<$DIALOG_TEMPFILE)
-                game_menu ;;
-            $DIALOG_HELP)
-                settings_menu ;;
-            $DIALOG_EXTRA)
-                select_core $(<$DIALOG_TEMPFILE)
-                case $CORE_BACKEND in
-                    ni)
-                        $DIALOG --title "Repository Info" --msgbox \
+            $DIALOG_HELP) settings_menu ; continue ;;
+            $DIALOG_OK)   ;;
+            *)            break ;;
+        esac
+
+        local category=$(<$DIALOG_TEMPFILE)
+        local -a core_list
+        case $category in
+            Consoles)  core_list=( $CONSOLE_CORES )  ;;
+            Computers) core_list=( $COMPUTER_CORES ) ;;
+        esac
+
+        # ── Second level: system picker ──
+        while true; do
+            local default_item=${CORE:-0}
+
+            $DIALOG --title "$TITLE — $category" --cancel-label "Back" \
+                --extra-button --extra-label "Info" \
+                --default-item "$default_item" \
+                --menu "Choose target system / repository:" 0 80 0 \
+                $core_list 2>$DIALOG_TEMPFILE
+
+            retval=$?
+            case $retval in
+                $DIALOG_OK)
+                    select_core $(<$DIALOG_TEMPFILE)
+                    game_menu ;;
+                $DIALOG_EXTRA)
+                    select_core $(<$DIALOG_TEMPFILE)
+                    case $CORE_BACKEND in
+                        ni)
+                            $DIALOG --title "Repository Info" --msgbox \
 "Core:    $CORE
 Backend: Internet Archive (ni-roms)
 System:  $CORE_NI_SYSTEM_ZIP
 Node:    $NI_NODE" 9 72 ;;
-                    ia)
-                        t=$($XMLLINT "$CORE_META_XML" \
-                            --xpath "string(metadata/title)" 2>/dev/null)
-                        d=$($XMLLINT "$CORE_META_XML" \
-                            --xpath "string(metadata/addeddate)" 2>/dev/null)
-                        $DIALOG --title "Repository Info" --msgbox \
+                        ia)
+                            t=$($XMLLINT "$CORE_META_XML" \
+                                --xpath "string(metadata/title)" 2>/dev/null)
+                            d=$($XMLLINT "$CORE_META_XML" \
+                                --xpath "string(metadata/addeddate)" 2>/dev/null)
+                            $DIALOG --title "Repository Info" --msgbox \
 "Core:    $CORE
 Backend: Internet Archive (ia download)
 ID:      $CORE_IA_IDENTIFIER
 Title:   $t
 Added:   $d" 11 72 ;;
-                esac
-                unset t d ;;
-            *)
-                break ;;
-        esac
+                    esac
+                    unset t d ;;
+                *)
+                    break ;;
+            esac
+        done
     done
 
     cleanup
