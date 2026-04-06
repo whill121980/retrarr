@@ -935,7 +935,7 @@ link_re = re.compile(
     r'href="/rom\?name=[^"]*%2F([^"]+\.zip)"',
     re.IGNORECASE
 )
-size_re = re.compile(r'<td[^>]*>\s*([\d.]+)\s*(B|KB|MB|GB)\s*</td>', re.IGNORECASE)
+size_re = re.compile(r'<span>\s*([\d.]+)\s*(B|KB|MB|GB)\s*</span>', re.IGNORECASE)
 
 links = link_re.findall(content)
 sizes = size_re.findall(content)
