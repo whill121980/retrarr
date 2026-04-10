@@ -1211,26 +1211,69 @@ PYEOF
 
     log_info "minerva_download_rom: $filename -> torrent file index $file_index"
 
-    # Download via aria2c BitTorrent with selective file download
+    # Download via aria2c BitTorrent with selective file download.
+    # Run in background with polling so the UI stays responsive and we can
+    # detect "no peers" quickly instead of blocking for minutes.
     local bt_dir="${CACHE_DIR}/minerva_bt"
     mkdir -p "$bt_dir"
-
-    $DIALOG --title "Downloading: ${filename}" \
-        --infobox "Fetching from Minerva Archive (${torrent_collection_name}) via BitTorrent...\n\n${filename}\n(Finding peers...)" 8 78
 
     $ARIA2C --select-file=$file_index \
         --dir="$bt_dir" \
         --seed-time=0 \
-        --bt-stop-timeout=120 \
+        --bt-stop-timeout=30 \
+        --bt-tracker-connect-timeout=10 \
+        --bt-tracker-timeout=15 \
         --file-allocation=none \
         --console-log-level=error \
         --download-result=hide \
         --check-certificate=false \
         -q \
-        "$torrent_file" 2>>"$LOG_FILE"
+        "$torrent_file" >>"$LOG_FILE" 2>&1 &
 
+    local aria_pid=$!
+    local -i elapsed=0
+    local -i peer_timeout=45   # give up entirely if no file appears in 45s
+    local -i max_wait=300      # hard cap at 5 minutes total
+
+    # Poll until aria2c finishes or we hit a timeout
+    while kill -0 $aria_pid 2>/dev/null; do
+        (( elapsed++ ))
+        local -a check_files=(${bt_dir}/**/${filename}(N))
+
+        if [[ -n $check_files ]]; then
+            # File appeared — download is in progress, show progress
+            local cur_size=$(wc -c < "${check_files[1]}" 2>/dev/null || print 0)
+            $DIALOG --title "Downloading: ${filename}" \
+                --infobox "Fetching from Minerva Archive (${torrent_collection_name})...\n\n${filename}\n$(humanise $cur_size) downloaded" 8 78
+        elif (( elapsed > peer_timeout )); then
+            # No file after peer_timeout seconds — no seeders
+            log_warn "minerva_download_rom: no peers found after ${peer_timeout}s, aborting"
+            kill $aria_pid 2>/dev/null
+            wait $aria_pid 2>/dev/null
+            rm -rf "$bt_dir"
+            $DIALOG --title "$TITLE" --msgbox \
+                "No seeders found for:\n${filename}\n\nMinerva Archive torrents may not have active peers.\nTry again later or use Internet Archive." 10 64
+            return 1
+        else
+            $DIALOG --title "Downloading: ${filename}" \
+                --infobox "Fetching from Minerva Archive (${torrent_collection_name})...\n\n${filename}\n(Finding peers... ${elapsed}s)" 8 78
+        fi
+
+        if (( elapsed >= max_wait )); then
+            log_warn "minerva_download_rom: hard timeout after ${max_wait}s"
+            kill $aria_pid 2>/dev/null
+            wait $aria_pid 2>/dev/null
+            rm -rf "$bt_dir"
+            $DIALOG --title "$TITLE" --msgbox \
+                "Download timed out for:\n${filename}\n\nTry again later." 8 60
+            return 1
+        fi
+        sleep 1
+    done
+
+    wait $aria_pid
     local aria_ret=$?
-    log_debug "minerva_download_rom: aria2c exit=$aria_ret"
+    log_debug "minerva_download_rom: aria2c exit=$aria_ret (${elapsed}s)"
 
     # Find the downloaded file in the nested torrent directory structure
     # Torrent extracts to: bt_dir/Minerva_Myrient/<Collection>/<Dir>/filename

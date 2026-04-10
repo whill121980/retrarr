@@ -2,7 +2,7 @@
 
 A ROM and disc image downloader for [MiSTer FPGA](https://mister-devel.github.io/MkDocs_MiSTer/), built as a spiritual successor to [MiSTer-ROMweasel](https://github.com/Koston-0xDEADBEEF/MiSTer-ROMweasel).
 
-Browse and download verified No-Intro ROM sets and Redump disc images directly on your MiSTer, with a familiar dialog-based TUI over SSH.
+Browse and download verified No-Intro ROM sets, Redump disc images, and RetroAchievements-verified ROMs directly on your MiSTer, with a familiar dialog-based TUI over SSH.
 
 ## Why?
 
@@ -11,16 +11,21 @@ MiSTer-ROMweasel's archive.org identifiers (`nointro.snes`, etc.) went dark. Myr
 ## Features
 
 - **52 supported systems** across Nintendo, Atari, NEC, Sega, SNK, Sony, Commodore, and more
-- **Two download backends:**
-  - `ni` -- No-Intro ROM sets via archive.org `ni-roms` (zip streaming through `view_archive.php`)
-  - `ia` -- CHD/disc images via `ia download` CLI (PlayStation, Saturn, Mega CD, TG16-CD, AO486, CD32)
-- **SHA1 verification** of every download against archive.org metadata
+- **Three download sources:**
+  - **Internet Archive** -- No-Intro ROM sets via `ni-roms` (zip streaming) and CHD/disc images via `ia download` (PlayStation, Saturn, Mega CD, TG16-CD, AO486, CD32)
+  - **Minerva Archive** -- RetroAchievements (hash-verified ROMs), No-Intro (dat-verified dumps), and Redump (disc images) via BitTorrent
+- **Source-separated menus** -- Minerva and Internet Archive are distinct paths with no cross-source merging
+- **SHA1 verification** of every Internet Archive download against archive.org metadata
 - **Encrypted credentials** -- archive.org login stored with AES-256-CBC, keyed to your device
 - **Leveled logging** -- `error` / `warn` / `info` / `debug` with automatic rotation
 - **Region and filter options** -- show/hide betas, prototypes, demos, unlicensed titles
 - **AO486 integration** -- auto-generates MGL setnames and per-game configs for the 0MHz DOS Collection
 - **Multi-disc CHD organization** -- automatically groups disc images into per-game subdirectories
 - **Zaparoo integration** -- `--zaparoo` CLI mode for NFC-triggered downloads with progress gauge
+
+### Note on Minerva Archive
+
+Minerva Archive is a community-driven project that serves files via BitTorrent. Their torrent infrastructure is still being built out, so **download reliability may vary** -- some systems may have few or no active seeders, especially for less popular collections. If a Minerva download stalls or fails, try again later or use the Internet Archive path for the same system. Internet Archive downloads are generally more reliable for immediate use.
 
 ## Supported Systems
 
@@ -151,8 +156,7 @@ RETRARR_LOG_LEVEL=debug /media/fat/Scripts/retrarr.sh
 
 ## Roadmap
 
-- **v0.2.x** -- Region filtering, multi-disc PSX testing, CD32 validation
-- **v0.3** -- Resume interrupted downloads, controller/gamepad navigation, download queue
+- **v0.3.x** -- TOSEC collection support, combined-index cross-source filtering, download queue
 - **v0.4** -- Multi-platform support (RetroPie, Bazzite/SteamOS, RetroArch)
 - **v1.0** -- *Arr-style architecture: REST API server, web UI, RetroNAS integration, ScreenScraper metadata
 
