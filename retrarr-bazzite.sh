@@ -199,7 +199,7 @@ init_static_globals () {
 
     typeset -gr GBC_BACKEND="ni"
     typeset -gr GBC_NI_SYSTEM_ZIP="Nintendo - Game Boy Color.zip"
-    typeset -gr GBC_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/gb"
+    typeset -gr GBC_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/gbc"
 
     typeset -gr GBA_BACKEND="ni"
     typeset -gr GBA_NI_SYSTEM_ZIP="Nintendo - Game Boy Advance.zip"
@@ -215,7 +215,7 @@ init_static_globals () {
 
     typeset -gr GG_BACKEND="ni"
     typeset -gr GG_NI_SYSTEM_ZIP="Sega - Game Gear.zip"
-    typeset -gr GG_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/mastersystem"
+    typeset -gr GG_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/gamegear"
 
     typeset -gr MD_BACKEND="ni"
     typeset -gr MD_NI_SYSTEM_ZIP="Sega - Mega Drive - Genesis.zip"
@@ -223,11 +223,11 @@ init_static_globals () {
 
     typeset -gr WS_BACKEND="ni"
     typeset -gr WS_NI_SYSTEM_ZIP="Bandai - WonderSwan.zip"
-    typeset -gr WS_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/wswan"
+    typeset -gr WS_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/wonderswan"
 
     typeset -gr WSC_BACKEND="ni"
     typeset -gr WSC_NI_SYSTEM_ZIP="Bandai - WonderSwan Color.zip"
-    typeset -gr WSC_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/wswanColor"
+    typeset -gr WSC_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/wonderswancolor"
 
     typeset -gr PV1000_BACKEND="ni"
     typeset -gr PV1000_NI_SYSTEM_ZIP="Casio - PV-1000.zip"
@@ -249,7 +249,7 @@ init_static_globals () {
 
     typeset -gr LYNX_BACKEND="ni"
     typeset -gr LYNX_NI_SYSTEM_ZIP="Atari - Lynx (LNX).zip"
-    typeset -gr LYNX_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/lynx"
+    typeset -gr LYNX_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/atarilynx"
 
     # ── Sega (additional) ──
 
@@ -261,7 +261,7 @@ init_static_globals () {
 
     typeset -gr SGX_BACKEND="ni"
     typeset -gr SGX_NI_SYSTEM_ZIP="NEC - PC Engine SuperGrafx.zip"
-    typeset -gr SGX_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/pcengine"
+    typeset -gr SGX_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/supergrafx"
 
     # ── Other ──
 
@@ -303,7 +303,7 @@ init_static_globals () {
 
     typeset -gr MSX2_BACKEND="ni"
     typeset -gr MSX2_NI_SYSTEM_ZIP="Microsoft - MSX2.zip"
-    typeset -gr MSX2_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/msx"
+    typeset -gr MSX2_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/msx2"
 
     # ── Atari (computer) ──
 
@@ -353,7 +353,7 @@ init_static_globals () {
 
     typeset -gr ADVISION_BACKEND="ni"
     typeset -gr ADVISION_NI_SYSTEM_ZIP="Entex - Adventure Vision.zip"
-    typeset -gr ADVISION_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/games/AVision"
+    typeset -gr ADVISION_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/adventurevision"
 
     typeset -gr NGP_BACKEND="ni"
     typeset -gr NGP_NI_SYSTEM_ZIP="SNK - NeoGeo Pocket.zip"
@@ -361,7 +361,7 @@ init_static_globals () {
 
     typeset -gr NGPC_BACKEND="ni"
     typeset -gr NGPC_NI_SYSTEM_ZIP="SNK - NeoGeo Pocket Color.zip"
-    typeset -gr NGPC_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/ngp"
+    typeset -gr NGPC_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/ngpc"
 
     # ── Additional computers ──
 
@@ -380,7 +380,7 @@ init_static_globals () {
     typeset -gr TG16CD_IA_IDENTIFIER="chd_pcecd"
     typeset -gr TG16CD_FILES_XML="chd_pcecd_files.xml"
     typeset -gr TG16CD_META_XML="chd_pcecd_meta.xml"
-    typeset -gr TG16CD_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/pcengine-CD"
+    typeset -gr TG16CD_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/pcenginecd"
 
     typeset -gr MCD_BACKEND="ia"
     typeset -gr MCD_IA_IDENTIFIER="corpse-killer-usa-32-x-cd"
@@ -1735,6 +1735,143 @@ settings_advanced () {
     esac
 }
 
+# ─── BIOS DOWNLOAD ────────────────────────────────────────────────────────────
+# BIOS/firmware files required by various RetroArch cores.
+# Source: archive.org/details/retroarch_bios
+# Destination: ${RETRODECK_ROOT}/bios/
+
+typeset -grA BIOS_FILES=(
+    # PlayStation — Beetle PSX / PCSX ReARMed
+    "scph5500.bin"      "PlayStation (JP)"
+    "scph5501.bin"      "PlayStation (US)"
+    "scph5502.bin"      "PlayStation (EU)"
+    # Sega CD — Genesis Plus GX / PicoDrive
+    "bios_CD_U.bin"     "Sega CD (US)"
+    "bios_CD_E.bin"     "Sega CD (EU)"
+    "bios_CD_J.bin"     "Sega CD (JP)"
+    # Sega Saturn — Beetle Saturn / Yabause
+    "sega_101.bin"      "Saturn (JP)"
+    "mpr-17933.bin"     "Saturn (US/EU)"
+    # PC Engine CD — Beetle PCE Fast
+    "syscard3.pce"      "PC Engine CD / TurboGrafx-CD"
+    # Atari Lynx — Handy / Beetle Lynx
+    "lynxboot.img"      "Atari Lynx"
+    # GBA — mGBA / Beetle GBA
+    "gba_bios.bin"      "Game Boy Advance"
+    # ColecoVision — blueMSX
+    "colecovision.rom"  "ColecoVision"
+    # Intellivision — FreeIntv
+    "exec.bin"          "Intellivision (EXEC)"
+    "grom.bin"          "Intellivision (GROM)"
+)
+
+typeset -gr BIOS_SOURCE_URL="https://archive.org/download/retroarch_bios"
+
+# Map systems to their required BIOS files
+typeset -grA BIOS_REQUIRED=(
+    PSXUS     "scph5500.bin scph5501.bin scph5502.bin"
+    PSXEU     "scph5500.bin scph5501.bin scph5502.bin"
+    PSXJP     "scph5500.bin scph5501.bin scph5502.bin"
+    PSXJP2    "scph5500.bin scph5501.bin scph5502.bin"
+    PSXMISC   "scph5500.bin scph5501.bin scph5502.bin"
+    MCD       "bios_CD_U.bin bios_CD_E.bin bios_CD_J.bin"
+    SS        "sega_101.bin mpr-17933.bin"
+    TG16CD    "syscard3.pce"
+    LYNX      "lynxboot.img"
+    GBA       "gba_bios.bin"
+    COLECO    "colecovision.rom"
+    INTV      "exec.bin grom.bin"
+)
+
+bios_download () {
+    local bios_dir="${RETRODECK_ROOT}/bios"
+    [[ -d $bios_dir ]] || mkdir -p "$bios_dir"
+
+    # Build checklist of all BIOS files with installed status
+    local -a menu_items=()
+    local f desc status
+    for f in ${(ko)BIOS_FILES}; do
+        desc=${BIOS_FILES[$f]}
+        if [[ -f "${bios_dir}/${f}" ]]; then
+            status="[installed]"
+        else
+            status="[missing]"
+        fi
+        menu_items+=("$f" "${desc} ${status}" "off")
+    done
+
+    while true; do
+        $DIALOG --title "BIOS / Firmware" \
+            --cancel-label "Back" \
+            --help-button --help-label "Download All Missing" \
+            --separate-output --checklist \
+            "Select BIOS files to download.\nDestination: ${bios_dir}\nSource: archive.org/details/retroarch_bios" \
+            0 78 0 \
+            $menu_items 2>$DIALOG_TEMPFILE
+
+        local retval=$?
+        case $retval in
+            $DIALOG_CANCEL|$DIALOG_ESC) return ;;
+            $DIALOG_HELP)
+                # Download all missing
+                local -a to_download=()
+                for f in ${(ko)BIOS_FILES}; do
+                    [[ ! -f "${bios_dir}/${f}" ]] && to_download+=("$f")
+                done
+                if [[ ${#to_download} -eq 0 ]]; then
+                    $DIALOG --title "BIOS" --msgbox "All BIOS files are already installed." 6 50
+                    return
+                fi
+                ;;
+            $DIALOG_OK)
+                local -a to_download=(${(f)"$(<$DIALOG_TEMPFILE)"})
+                [[ ${#to_download} -eq 0 ]] && return
+                ;;
+            *) return ;;
+        esac
+
+        # Download selected files
+        local -i ok=0 fail=0 total=${#to_download}
+        local i=0
+        for f in $to_download; do
+            (( i++ ))
+            desc=${BIOS_FILES[$f]}
+            log_info "bios_download: $f ($desc)"
+
+            printf "XXX\n%i\n\nDownloading BIOS: %s\n%s\nXXX\n" \
+                $(( 100 * i / total )) "$f" "$desc"
+
+            if $CURL "${CURL_OPTS[@]}" -sL "${BIOS_SOURCE_URL}/${f}" -o "${bios_dir}/${f}" 2>>"$LOG_FILE"; then
+                if [[ -f "${bios_dir}/${f}" && -s "${bios_dir}/${f}" ]]; then
+                    log_info "bios_download: $f OK"
+                    (( ++ok ))
+                else
+                    log_error "bios_download: $f empty/missing after download"
+                    rm -f "${bios_dir}/${f}"
+                    (( ++fail ))
+                fi
+            else
+                log_error "bios_download: $f FAILED"
+                rm -f "${bios_dir}/${f}"
+                (( ++fail ))
+            fi
+        done | $DIALOG --title "Downloading BIOS Files" --gauge \
+            "Starting..." 8 60 0
+
+        local msg="${ok} BIOS file(s) downloaded"
+        [[ $fail -gt 0 ]] && msg+=", ${fail} failed"
+        $DIALOG --title "BIOS Download" --msgbox "$msg" 6 45
+
+        # Refresh menu items with updated status
+        menu_items=()
+        for f in ${(ko)BIOS_FILES}; do
+            desc=${BIOS_FILES[$f]}
+            [[ -f "${bios_dir}/${f}" ]] && status="[installed]" || status="[missing]"
+            menu_items+=("$f" "${desc} ${status}" "off")
+        done
+    done
+}
+
 settings_menu () {
     local retval
     while true; do
@@ -1744,8 +1881,9 @@ settings_menu () {
         $DIALOG --title "Settings" \
             --cancel-label "Back" \
             --menu "Configure Retrarr:" \
-            14 65 5 \
+            15 65 6 \
             "ia"       "archive.org credentials ${ia_status}" \
+            "bios"     "BIOS / Firmware files" \
             "region"   "Region preference (current: ${REGION_PREF})" \
             "display"  "Display options" \
             "dirs"     "Game directories" \
@@ -1756,6 +1894,7 @@ settings_menu () {
 
         case $(<$DIALOG_TEMPFILE) in
             ia)       settings_ia ;;
+            bios)     bios_download ;;
             region)   settings_region ;;
             display)  settings_display ;;
             dirs)     settings_dirs ;;
