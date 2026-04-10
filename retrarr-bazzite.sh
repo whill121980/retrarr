@@ -1787,15 +1787,15 @@ bios_download () {
 
     # Build checklist of all BIOS files with installed status
     local -a menu_items=()
-    local f desc status
+    local f desc bstatus
     for f in ${(ko)BIOS_FILES}; do
         desc=${BIOS_FILES[$f]}
         if [[ -f "${bios_dir}/${f}" ]]; then
-            status="[installed]"
+            bstatus="[installed]"
         else
-            status="[missing]"
+            bstatus="[missing]"
         fi
-        menu_items+=("$f" "${desc} ${status}" "off")
+        menu_items+=("$f" "${desc} ${bstatus}" "off")
     done
 
     while true; do
@@ -1864,8 +1864,8 @@ bios_download () {
         menu_items=()
         for f in ${(ko)BIOS_FILES}; do
             desc=${BIOS_FILES[$f]}
-            [[ -f "${bios_dir}/${f}" ]] && status="[installed]" || status="[missing]"
-            menu_items+=("$f" "${desc} ${status}" "off")
+            [[ -f "${bios_dir}/${f}" ]] && bstatus="[installed]" || bstatus="[missing]"
+            menu_items+=("$f" "${desc} ${bstatus}" "off")
         done
     done
 }
