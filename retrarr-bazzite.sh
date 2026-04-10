@@ -171,7 +171,7 @@ init_static_globals () {
         "ATARIST"    "Atari ST"                            \
         "ATARI800"   "Atari 800 / XL / XE"                 \
         "RX78"       "Bandai RX-78 Gundam"                 \
-        "AO486"      "0MHz DOS Collection"                 \
+        # "AO486"      "0MHz DOS Collection"               \  # MiSTer-only; revisit for eXoDOS / DOSBox-Pure
         "CD32"       "Amiga CD32"                          \
     )
 
@@ -424,11 +424,13 @@ init_static_globals () {
     typeset -gr PSXMISC_META_XML="chd_psx_misc_meta.xml"
     typeset -gr PSXMISC_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/psx"
 
-    typeset -gr AO486_BACKEND="ia"
-    typeset -gr AO486_IA_IDENTIFIER="0mhz-dos"
-    typeset -gr AO486_FILES_XML="0mhz-dos_files.xml"
-    typeset -gr AO486_META_XML="0mhz-dos_meta.xml"
-    typeset -gr AO486_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}"
+    # AO486 / DOS — commented out: 0MHz is MiSTer-only format.
+    # Revisit for eXoDOS or other DOSBox-Pure-compatible sources.
+    # typeset -gr AO486_BACKEND="ia"
+    # typeset -gr AO486_IA_IDENTIFIER="0mhz-dos"
+    # typeset -gr AO486_FILES_XML="0mhz-dos_files.xml"
+    # typeset -gr AO486_META_XML="0mhz-dos_meta.xml"
+    # typeset -gr AO486_GAMEDIR_DEFAULT="${RETRODECK_ROOT:-$HOME/retrodeck}/roms/dos"
 
     typeset -gr CD32_BACKEND="ia"
     typeset -gr CD32_IA_IDENTIFIER="commodore-amiga-cd32-redump-collection"
@@ -986,7 +988,7 @@ get_rom_gamedir () {
     local odir="${CORE_GAMEDIR}/"
     local match mbegin mend
 
-    [[ $tag == *.7z || $CORE == "AO486" ]] && { print "$odir" ; return }
+    [[ $tag == *.7z ]] && { print "$odir" ; return }
 
     tag=${${(Q)tag%.chd}##*/}
 
@@ -1251,14 +1253,10 @@ proc.wait()
     fi
 
     [[ -d $dest_dir ]] || mkdir -p "$dest_dir"
-    if [[ $ofile == *.7z || $CORE == "AO486" ]]; then
+    if [[ $ofile == *.7z ]]; then
         $SZR e "$ofile" -o"$dest_dir" -y && rm -f "$ofile"
     elif [[ $ofile == *.zip ]]; then
         $UNZIP -o -qq -d "$dest_dir" "$ofile"
-        if [[ $CORE == "AO486" ]]; then
-            local mgl=$CORE_GAMEDIR/$($UNZIP -l "$ofile" | grep -o '_DOS Games/.*\.mgl$')
-            disabled_ao486_append_setname "$mgl"
-        fi
         rm -f "$ofile"
     else
         mv "$ofile" "$dest_dir"
@@ -1664,7 +1662,7 @@ settings_dirs () {
     group_cores[Sony]="PSXUS PSXEU PSXJP PSXJP2 PSXMISC"
     group_cores[Commodore]="C64 VIC20 C16"
     group_cores[Microsoft]="MSX MSX2"
-    group_cores[Other]="INTV COLECO VECTREX ODYSSEY2 CHANNELF WS WSC PV1000 ASTROCADE ARCADIA ADVISION GAMATE MEGADUCK SCV RX78 AO486 CD32"
+    group_cores[Other]="INTV COLECO VECTREX ODYSSEY2 CHANNELF WS WSC PV1000 ASTROCADE ARCADIA ADVISION GAMATE MEGADUCK SCV RX78 CD32"
 
     while true; do
         $DIALOG --title "Game Directories" \
