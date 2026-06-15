@@ -9,3 +9,9 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Visual Studio
+.vs/
+*.sln
+*.slnx
+*.vcxproj
