@@ -1,5 +1,5 @@
 #!/bin/zsh
-# retrarr.sh — Retro Retriever v0.3.1
+# retrarr.sh — Retro Retriever v0.3.2
 # Spiritual successor to MiSTer-ROMweasel by Koston-0xDEADBEEF
 #
 # Sources:
@@ -1447,7 +1447,7 @@ get_rom_gamedir () {
         [[ -z $match ]] || odir+="${match}/"
     fi
 
-    local base="${tag% (Disc [0-9AB])*}"
+    local base="${tag% \(Disc [0-9AB]\)*}"
     (( $#base == $#tag )) && { print "${odir}${base}/" ; return }
 
     local tmpdata
@@ -1824,7 +1824,7 @@ organise_chd_dir () {
     local tag base nbase i
     for (( i=1; i <= $#tags; i++ )); do
         tag="${${(Q)tags[i]%.chd}##*/}"
-        base="${tag% (Disc [0-9AB])*}"
+        base="${tag% \(Disc [0-9AB]\)*}"
         if (( $#base == $#tag )); then
             [[ -d "${gamedir}/${base}" ]] || mkdir "${gamedir}/${base}"
             mv "${tags[i]}" "${gamedir}/${base}"
