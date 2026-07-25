@@ -1,5 +1,5 @@
 #!/bin/zsh
-# retrarr.sh — Retro Retriever v0.3.2
+# retrarr.sh — Retro Retriever v0.3.3
 # Spiritual successor to MiSTer-ROMweasel by Koston-0xDEADBEEF
 #
 # Sources:
@@ -23,7 +23,7 @@ autoload zmv
 # ─── STATIC GLOBALS ────────────────────────────────────────────────────────────
 
 init_static_globals () {
-    typeset -gr RETRARR_VERSION="Retro Retriever v0.3.1"
+    typeset -gr RETRARR_VERSION="Retro Retriever v0.3.3"
 
     # Required binaries
     typeset -gr XMLLINT=$(which xmllint)  || { print -u2 "ERROR: xmllint not found"  ; return 1 }
@@ -39,10 +39,10 @@ init_static_globals () {
     typeset -gr OPENSSL=$(which openssl)  || { print -u2 "ERROR: openssl not found"   ; return 1 }
 
     # Optional: aria2c for faster downloads (multi-connection, resume, torrent support)
-    typeset -gr ARIA2C=$(which aria2c 2>/dev/null || print "")
+    typeset -g ARIA2C=$(which aria2c 2>/dev/null || print "")
 
     # internetarchive CLI — pip3 install internetarchive
-    typeset -gr IA=$(which ia 2>/dev/null || print "")
+    typeset -g IA=$(which ia 2>/dev/null || print "")
 
     # MiSTer SSL CA bundle is outdated — suppress cert warnings
     # Fix: apt-get update && apt-get install -y ca-certificates && update-ca-certificates
@@ -789,47 +789,46 @@ PYEOF
 }
 
 bootstrap_deps () {
+    # Verify BOTH the ia CLI AND the internetarchive Python module. A stale
+    # `ia` shim without a working module would otherwise short-circuit the
+    # check and blow up later in ia_login.
+    local module_ok=false
+    $PYTHON -c "import internetarchive" 2>/dev/null && module_ok=true
+    log_info "bootstrap_deps: ia_bin='${IA:-<missing>}' module_ok=$module_ok"
+
+    if [[ -z $IA ]] || ! $module_ok; then
+        log_info "bootstrap_deps: installing internetarchive (CLI or module missing)"
+
+        {
+            print "XXX\n10\nBootstrapping pip (python3 -m ensurepip)...\nXXX"
+            $PYTHON -m ensurepip 2>&1
+            print "XXX\n40\nUpgrading pip...\nXXX"
+            pip3 install --upgrade pip 2>&1
+            print "XXX\n70\nInstalling internetarchive CLI...\nXXX"
+            pip3 install --upgrade internetarchive 2>&1
+            print "XXX\n100\nDone.\nXXX"
+        } | $DIALOG --title "First-Time Setup" --gauge \
+            "Installing Python dependencies (one-time)..." 8 65 0
+
+        typeset -g IA=$(which ia 2>/dev/null || print "")
+        if [[ -z $IA ]] || ! $PYTHON -c "import internetarchive" 2>/dev/null; then
+            $DIALOG --title "Installation Failed" --msgbox \
+                "Could not install internetarchive automatically.\n\nCheck your network, then SSH in and run:\n\n  python3 -m ensurepip\n  pip3 install --upgrade pip\n  pip3 install --upgrade internetarchive" \
+                12 65
+            exit 1
+        fi
+        log_info "bootstrap_deps: internetarchive installed OK ($IA)"
+    fi
+
     # aria2c — bundled by update_all as /media/fat/linux/aria2c.
     # Warn (not fatal) if missing: only Minerva sources need it.
+    # Runs AFTER the ia check so the message shows even on fresh installs.
     if [[ -z $ARIA2C ]]; then
         log_warn "bootstrap_deps: aria2c not found; Minerva sources will be unavailable"
         $DIALOG --title "Missing: aria2c" --msgbox \
-            "aria2c is not installed.\n\nInternet Archive sources will still work, but Minerva Archive collections require aria2c for torrent-based downloads.\n\nTo install: re-run update_all with the retrarr custom DB. The DB should install aria2c to /media/fat/linux/aria2c automatically.\n\nIf update_all did not install it, aria2c may not yet be bundled — check the retrarr GitHub for status." \
-            16 65
+            "aria2c is not installed.\n\nInternet Archive sources will work, but Minerva Archive collections require aria2c for torrent downloads.\n\nRe-run update_all with the retrarr DB to install aria2c to /media/fat/linux/aria2c. If update_all did not install it, the binary may not yet be bundled — check the retrarr GitHub." \
+            14 65
     fi
-
-    # internetarchive CLI — required for IA CHD downloads
-    [[ -n $IA ]] && return 0
-
-    $DIALOG --title "First-Time Setup" --yesno \
-        "The internetarchive CLI (ia) is not installed.\n\nRetrarr needs it to download ROMs from archive.org.\n\nInstall it now? This will run:\n\n  python3 -m ensurepip\n  pip3 install --upgrade pip\n  pip3 install internetarchive\n\n(Requires internet connection)" \
-        16 65
-    [[ $? -ne $DIALOG_OK ]] && { print -u2 "Cannot continue without internetarchive CLI." ; exit 1 }
-
-    # Run install steps with progress feedback
-    {
-        print "XXX\n10\nBootstrapping pip...\nXXX"
-        $PYTHON -m ensurepip 2>&1
-        print "XXX\n40\nUpgrading pip...\nXXX"
-        pip3 install --upgrade pip 2>&1
-        print "XXX\n60\nInstalling internetarchive...\nXXX"
-        pip3 install internetarchive 2>&1
-        print "XXX\n100\nDone!\nXXX"
-    } | $DIALOG --title "Installing Dependencies" --gauge "Starting..." 8 65 0
-
-    # Verify it worked
-    typeset -gr IA=$(which ia 2>/dev/null || print "")
-    if [[ -z $IA ]]; then
-        $DIALOG --title "Installation Failed" --msgbox \
-            "Could not install internetarchive CLI.\n\nCheck your network connection and try:\n\n  python3 -m ensurepip\n  pip3 install --upgrade pip\n  pip3 install internetarchive" \
-            12 65
-        exit 1
-    fi
-
-    log_info "bootstrap_deps: internetarchive CLI installed successfully"
-    $DIALOG --title "Setup Complete" --msgbox \
-        "internetarchive CLI installed successfully.\n\nYou will now be prompted to configure your archive.org credentials." \
-        8 65
 }
 
 check_ia () {
