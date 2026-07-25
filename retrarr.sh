@@ -1236,18 +1236,23 @@ PYEOF
     local bt_dir="${CACHE_DIR}/minerva_bt"
     mkdir -p "$bt_dir"
 
-    $ARIA2C --select-file=$file_index \
-        --dir="$bt_dir" \
-        --seed-time=0 \
-        --bt-stop-timeout=30 \
-        --bt-tracker-connect-timeout=10 \
-        --bt-tracker-timeout=15 \
-        --file-allocation=none \
-        --console-log-level=error \
-        --download-result=hide \
-        --check-certificate=false \
-        -q \
-        "$torrent_file" >>"$LOG_FILE" 2>&1 &
+    local -a aria2_args=(
+        --select-file=$file_index
+        --dir="$bt_dir"
+        --seed-time=0
+        --bt-stop-timeout=30
+        --bt-tracker-connect-timeout=10
+        --bt-tracker-timeout=15
+        --file-allocation=none
+        --console-log-level=error
+        --download-result=hide
+        --check-certificate=false
+        -q
+        "$torrent_file"
+    )
+    log_debug "minerva_download_rom: exec: $ARIA2C ${(j: :)aria2_args}"
+
+    $ARIA2C "${aria2_args[@]}" >>"$LOG_FILE" 2>&1 &
 
     local aria_pid=$!
     local -i elapsed=0
