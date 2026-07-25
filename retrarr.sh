@@ -1210,7 +1210,10 @@ info = torrent['info']
 if 'files' in info:
     for i, entry in enumerate(info['files']):
         path = '/'.join(p if isinstance(p, str) else p.decode() for p in entry['path'])
-        if path.endswith(target):
+        # Exact basename match. endswith() was matching "Super Mario World
+        # (USA).zip" against "Super Mario All-Stars + Super Mario World
+        # (USA).zip" and returning the wrong torrent index.
+        if path.rsplit('/', 1)[-1] == target:
             print(i + 1)
             sys.exit(0)
 print(0)
@@ -1248,7 +1251,7 @@ PYEOF
 
     local aria_pid=$!
     local -i elapsed=0
-    local -i peer_timeout=45   # give up entirely if no file appears in 45s
+    local -i peer_timeout=90   # cold DHT bootstrap can eat 15-30s alone
     local -i max_wait=300      # hard cap at 5 minutes total
 
     # Poll until aria2c finishes or we hit a timeout
