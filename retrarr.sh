@@ -39,7 +39,10 @@ init_static_globals () {
     typeset -gr OPENSSL=$(which openssl)  || { print -u2 "ERROR: openssl not found"   ; return 1 }
 
     # Optional: aria2c for faster downloads (multi-connection, resume, torrent support)
-    typeset -g ARIA2C=$(which aria2c 2>/dev/null || print "")
+    # BusyBox `which` prints "aria2c not found" to stdout on miss, poisoning
+    # $ARIA2C with a garbage value that survives `[[ -z ]]` checks. Use
+    # `command -v` which stays silent when the target is missing.
+    typeset -g ARIA2C=$(command -v aria2c 2>/dev/null)
     # Fallback: our update_all DB ships a static armv7 aria2c here since
     # /media/fat/linux/ is off-limits to custom DBs.
     if [[ -z $ARIA2C && -x /media/fat/Scripts/.retrarr/aria2c ]]; then
@@ -47,7 +50,7 @@ init_static_globals () {
     fi
 
     # internetarchive CLI — pip3 install internetarchive
-    typeset -g IA=$(which ia 2>/dev/null || print "")
+    typeset -g IA=$(command -v ia 2>/dev/null)
 
     # MiSTer SSL CA bundle is outdated — suppress cert warnings
     # Fix: apt-get update && apt-get install -y ca-certificates && update-ca-certificates
@@ -815,7 +818,7 @@ bootstrap_deps () {
         } | $DIALOG --title "First-Time Setup" --gauge \
             "Installing Python dependencies (one-time)..." 8 65 0
 
-        typeset -g IA=$(which ia 2>/dev/null || print "")
+        typeset -g IA=$(command -v ia 2>/dev/null)
         if [[ -z $IA ]] || ! $PYTHON -c "import internetarchive" 2>/dev/null; then
             $DIALOG --title "Installation Failed" --msgbox \
                 "Could not install internetarchive automatically.\n\nCheck your network, then SSH in and run:\n\n  python3 -m ensurepip\n  pip3 install --upgrade pip\n  pip3 install --upgrade internetarchive" \
