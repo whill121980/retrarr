@@ -21,22 +21,22 @@ GITHUB_USER="whill121980"
 REPO_NAME="retrarr"
 BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "master")
 
-# Optional: include static aria2c binary if present at bin/aria2c-mister
+# Custom DBs are barred from writing to /media/fat/linux/ (Downloader_MiSTer
+# reserves that root folder for the official Distribution_MiSTer DB). Ship
+# aria2c under Scripts/.retrarr/ instead — the script knows to look there.
 ARIA2_ENTRY=""
+ARIA2_FOLDER=""
 if [[ -f "$ARIA2_BIN" ]]; then
     ARIA2_HASH=$(md5sum "$ARIA2_BIN" | awk '{print $1}')
     ARIA2_SIZE=$(wc -c < "$ARIA2_BIN" | tr -d ' ')
     ARIA2_ENTRY=",
-    \"linux/aria2c\": {
+    \"Scripts/.retrarr/aria2c\": {
       \"hash\": \"${ARIA2_HASH}\",
       \"size\": ${ARIA2_SIZE},
-      \"url\": \"https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NAME}/${BRANCH}/bin/aria2c-mister\",
-      \"path\": \"system\"
+      \"url\": \"https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NAME}/${BRANCH}/bin/aria2c-mister\"
     }"
     ARIA2_FOLDER=",
-    \"linux\": {\"path\": \"system\"}"
-else
-    ARIA2_FOLDER=""
+    \"Scripts/.retrarr\": {}"
 fi
 
 cat > "$DB_OUT" << EOF
@@ -62,6 +62,7 @@ echo "  retrarr.sh size:  $SIZE"
 if [[ -n "$ARIA2_ENTRY" ]]; then
     echo "  aria2c hash:      $ARIA2_HASH"
     echo "  aria2c size:      $ARIA2_SIZE"
+    echo "  aria2c install:   Scripts/.retrarr/aria2c"
 else
     echo "  aria2c binary:    NOT bundled (drop at bin/aria2c-mister to include)"
 fi

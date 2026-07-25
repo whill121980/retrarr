@@ -40,6 +40,11 @@ init_static_globals () {
 
     # Optional: aria2c for faster downloads (multi-connection, resume, torrent support)
     typeset -g ARIA2C=$(which aria2c 2>/dev/null || print "")
+    # Fallback: our update_all DB ships a static armv7 aria2c here since
+    # /media/fat/linux/ is off-limits to custom DBs.
+    if [[ -z $ARIA2C && -x /media/fat/Scripts/.retrarr/aria2c ]]; then
+        ARIA2C=/media/fat/Scripts/.retrarr/aria2c
+    fi
 
     # internetarchive CLI — pip3 install internetarchive
     typeset -g IA=$(which ia 2>/dev/null || print "")

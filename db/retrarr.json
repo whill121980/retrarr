@@ -1,21 +1,20 @@
 {
   "db_id": "retrarr",
-  "timestamp": 1785012816,
+  "timestamp": 1785013072,
   "files": {
     "Scripts/retrarr.sh": {
-      "hash": "5c6f56e48650752e2b4e54212bb9df2f",
-      "size": 102572,
+      "hash": "eed055cd997f40e6046efecd75e8de10",
+      "size": 102826,
       "url": "https://raw.githubusercontent.com/whill121980/retrarr/devel/retrarr.sh"
     },
-    "linux/aria2c": {
+    "Scripts/.retrarr/aria2c": {
       "hash": "69f0d35fdda41dd6bebbd4cf6ed79008",
       "size": 12304196,
-      "url": "https://raw.githubusercontent.com/whill121980/retrarr/devel/bin/aria2c-mister",
-      "path": "system"
+      "url": "https://raw.githubusercontent.com/whill121980/retrarr/devel/bin/aria2c-mister"
     }
   },
   "folders": {
     "Scripts": {},
-    "linux": {"path": "system"}
+    "Scripts/.retrarr": {}
   }
 }
