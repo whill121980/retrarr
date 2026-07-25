@@ -789,7 +789,16 @@ PYEOF
 }
 
 bootstrap_deps () {
-    # Check if internetarchive CLI is installed; if not, offer to install it
+    # aria2c — bundled by update_all as /media/fat/linux/aria2c.
+    # Warn (not fatal) if missing: only Minerva sources need it.
+    if [[ -z $ARIA2C ]]; then
+        log_warn "bootstrap_deps: aria2c not found; Minerva sources will be unavailable"
+        $DIALOG --title "Missing: aria2c" --msgbox \
+            "aria2c is not installed.\n\nInternet Archive sources will still work, but Minerva Archive collections require aria2c for torrent-based downloads.\n\nTo install: re-run update_all with the retrarr custom DB. The DB should install aria2c to /media/fat/linux/aria2c automatically.\n\nIf update_all did not install it, aria2c may not yet be bundled — check the retrarr GitHub for status." \
+            16 65
+    fi
+
+    # internetarchive CLI — required for IA CHD downloads
     [[ -n $IA ]] && return 0
 
     $DIALOG --title "First-Time Setup" --yesno \

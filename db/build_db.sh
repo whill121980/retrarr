@@ -5,6 +5,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 RETRARR="$REPO_ROOT/retrarr.sh"
+ARIA2_BIN="$REPO_ROOT/bin/aria2c-mister"
 DB_OUT="$SCRIPT_DIR/retrarr.json"
 
 if [[ ! -f "$RETRARR" ]]; then
@@ -16,12 +17,27 @@ HASH=$(md5sum "$RETRARR" | awk '{print $1}')
 SIZE=$(wc -c < "$RETRARR" | tr -d ' ')
 TIMESTAMP=$(date +%s)
 
-# TODO: Update GitHub username/org when repo is created
 GITHUB_USER="whill121980"
 REPO_NAME="retrarr"
-
-# Use current git branch to determine which branch the DB should point to
 BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "master")
+
+# Optional: include static aria2c binary if present at bin/aria2c-mister
+ARIA2_ENTRY=""
+if [[ -f "$ARIA2_BIN" ]]; then
+    ARIA2_HASH=$(md5sum "$ARIA2_BIN" | awk '{print $1}')
+    ARIA2_SIZE=$(wc -c < "$ARIA2_BIN" | tr -d ' ')
+    ARIA2_ENTRY=",
+    \"linux/aria2c\": {
+      \"hash\": \"${ARIA2_HASH}\",
+      \"size\": ${ARIA2_SIZE},
+      \"url\": \"https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NAME}/${BRANCH}/bin/aria2c-mister\",
+      \"path\": \"system\"
+    }"
+    ARIA2_FOLDER=",
+    \"linux\": {\"path\": \"system\"}"
+else
+    ARIA2_FOLDER=""
+fi
 
 cat > "$DB_OUT" << EOF
 {
@@ -32,15 +48,21 @@ cat > "$DB_OUT" << EOF
       "hash": "${HASH}",
       "size": ${SIZE},
       "url": "https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NAME}/${BRANCH}/retrarr.sh"
-    }
+    }${ARIA2_ENTRY}
   },
   "folders": {
-    "Scripts": {}
+    "Scripts": {}${ARIA2_FOLDER}
   }
 }
 EOF
 
 echo "Updated $DB_OUT"
-echo "  hash:      $HASH"
-echo "  size:      $SIZE"
-echo "  timestamp: $TIMESTAMP"
+echo "  retrarr.sh hash:  $HASH"
+echo "  retrarr.sh size:  $SIZE"
+if [[ -n "$ARIA2_ENTRY" ]]; then
+    echo "  aria2c hash:      $ARIA2_HASH"
+    echo "  aria2c size:      $ARIA2_SIZE"
+else
+    echo "  aria2c binary:    NOT bundled (drop at bin/aria2c-mister to include)"
+fi
+echo "  timestamp:        $TIMESTAMP"
