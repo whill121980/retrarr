@@ -190,14 +190,48 @@ RETRARR_LOG_LEVEL=debug /media/fat/Scripts/retrarr.sh
 
 ## Roadmap
 
-- **v0.3.x** — Dreamcast (via DreamSTer) with `chdman` CHD→CUE/BIN conversion, DAT-based post-download verification, region filtering by filename convention, TOSEC collection support
-- **v0.4** — Multi-platform unification: single script auto-detects MiSTer / Bazzite / RetroBat / WSL and applies the right folder conventions and dependencies (early ports of Bazzite and WSL already in the repo)
-- **v1.0** — *Arr-style architecture: REST API server, web UI, RetroNAS integration, ScreenScraper metadata, offloaded torrent handling
+Grouped by readiness, not by version. Features get resequenced routinely
+and version-pinning turns plans into broken commitments the moment
+priorities shift.
+
+**In progress**
+- Dreamcast — Minerva Redump + IA both shipped in v0.3.6; RA `.chd`
+  subset waits on `chdman` and DC core-side RA support
+- PSX Redump — unified set vs the 5 IA split regions, needs mapping
+- Zaparoo source preference (currently IA-only)
+
+**Ready — no blocking dependencies**
+- Filtering (Tier 1) — regex-based region filtering from
+  No-Intro/Redump filename tags, no external data needed
+- `chdman` bundling — ARM static build already sourced (see
+  [`bin/README.md`](bin/README.md)); unlocks any IA-CHD-only source
+  and the RA subset for DC/PSX/etc.
+- Multi-platform unification — single script auto-detects
+  MiSTer/Bazzite/RetroBat/WSL and applies the right folder conventions
+  (Bazzite and WSL ports already in-repo as separate scripts)
+
+**Waiting on external data**
+- Filtering (Tier 2, DAT integration) — cache No-Intro + Redump DATs
+  locally for explicit region/language/checksums/dump status
+- TOSEC collection support — 1M+ files, scraping approach unresolved
+
+**Long-term / *Arr-shaped** — REST API server, web UI, RetroNAS
+integration, ScreenScraper metadata, Prowlarr indexer definitions,
+MAME/arcade support. Big architectural pivot, wouldn't stabilize
+in time for a first stable release.
 
 ## Credits
 
 - Inspired by [MiSTer-ROMweasel](https://github.com/Koston-0xDEADBEEF/MiSTer-ROMweasel) by Koston-0xDEADBEEF
 - Built for the [MiSTer FPGA](https://mister-devel.github.io/MkDocs_MiSTer/) community
+- Bundled binaries (see [`bin/README.md`](bin/README.md) for full attribution):
+  - [`aria2`](https://github.com/aria2/aria2) — BitTorrent + multi-connection HTTP downloader used for the Minerva path. ARM static build from [abcfy2/aria2-static-build](https://github.com/abcfy2/aria2-static-build)
+  - [`chdman`](https://github.com/mamedev/mame) (part of MAME) — CHD ↔ CUE/BIN converter, staged for a future release. Static build from [emmercm/chdman-js](https://github.com/emmercm/chdman-js)
+- Source hosts:
+  - [Internet Archive](https://archive.org) — No-Intro (`ni-roms`) and CHD/Redump items
+  - [Minerva Archive](https://minerva-archive.org) — RetroAchievements, No-Intro, and Redump BitTorrent collections
+- Cores this integrates with directly:
+  - [DreamSTer](https://github.com/skmp/DreamSTer) by skmp — MiSTer Dreamcast core, target of the DC path
 
 ## License
 
