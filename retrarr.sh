@@ -1240,9 +1240,9 @@ PYEOF
         --select-file=$file_index
         --dir="$bt_dir"
         --seed-time=0
-        --bt-stop-timeout=30
-        --bt-tracker-connect-timeout=10
-        --bt-tracker-timeout=15
+        --bt-stop-timeout=90
+        --bt-tracker-connect-timeout=15
+        --bt-tracker-timeout=30
         --file-allocation=none
         --console-log-level=error
         --download-result=hide
@@ -1298,6 +1298,18 @@ PYEOF
     wait $aria_pid
     local aria_ret=$?
     log_debug "minerva_download_rom: aria2c exit=$aria_ret (${elapsed}s)"
+
+    # aria2c exit codes: 0 = complete, non-zero = at least one piece failed.
+    # With --file-allocation=none, an incomplete file still has its full byte
+    # length on disk but with zeroed holes where missing pieces belong. Refuse
+    # to hand that to unzip / mv — it looks like a valid file but isn't.
+    if (( aria_ret != 0 )); then
+        log_error "minerva_download_rom: aria2c exit=$aria_ret — download incomplete for $filename"
+        rm -rf "$bt_dir"
+        $DIALOG --title "$TITLE" --msgbox \
+            "Torrent download for:\n${filename}\n\nended incomplete (aria2c exit=${aria_ret}).\nSome pieces did not verify. Try again in a moment — the swarm may pick up." 12 66
+        return 1
+    fi
 
     # Find the downloaded file in the nested torrent directory structure
     # Torrent extracts to: bt_dir/Minerva_Myrient/<Collection>/<Dir>/filename
