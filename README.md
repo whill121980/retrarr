@@ -1,14 +1,27 @@
 # Retrarr (Retro Retriever) — `master` branch (deprecated)
 
-> ⚠️ **This branch is deprecated and frozen.** Retrarr now lives on the
-> [`beta`](https://github.com/whill121980/retrarr/tree/beta) branch. The
-> existing `master` install continues to work but will not receive
-> updates or bug fixes.
+> ⚠️ **This branch is deprecated and frozen.** Retrarr has moved to a
+> channel-based release model:
 >
-> **To migrate:**
-> 1. Edit `/media/fat/downloader.ini` and remove the `[retrarr]` section
->    (two lines pointing at `/master/db/retrarr.json`)
-> 2. Install the new drop-in registration file:
+> - [`beta`](https://github.com/whill121980/retrarr/tree/beta) —
+>   feature-complete, user-tested releases (where updates and bug
+>   fixes land)
+> - `alpha` (coming soon) — where new features go for tester
+>   feedback before graduating to beta
+>
+> **Why the change:** the old single-`master` branch tried to be both
+> bleeding edge and stable at the same time, which caused incoming
+> updates to sometimes break working installs. The new structure
+> separates the two, so users can pick their tolerance for churn.
+>
+> **Master is frozen** at its current state so anyone still installing
+> from it can't be accidentally broken by an incoming change. It
+> receives no further updates.
+>
+> **To migrate to the beta channel:**
+> 1. Edit `/media/fat/downloader.ini` and remove the `[retrarr]`
+>    section (two lines pointing at `/master/db/retrarr.json`)
+> 2. Install the drop-in registration file:
 >    ```bash
 >    wget -O /media/fat/downloader_retrarr.ini \
 >      https://raw.githubusercontent.com/whill121980/retrarr/beta/downloader_retrarr.ini

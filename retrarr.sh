@@ -654,25 +654,39 @@ PYEOF
 show_master_deprecation () {
     log_info "master deprecation notice shown"
     $DIALOG --title "Retrarr — install channel deprecated" --msgbox \
-"You are running Retrarr from the deprecated 'master' install\n\
-channel. This branch is frozen — no future updates or bug fixes\n\
-will land here.\n\
+"You are running Retrarr from the deprecated 'master' install channel.\n\
+This branch is frozen — no future updates or bug fixes will land here.\n\
+This notice is informational; the current version keeps working.\n\
 \n\
-The current version continues to work; this notice is informational.\n\
+Why the change:\n\
 \n\
-To move to the new 'beta' channel and receive updates:\n\
+Retrarr has moved to a channel-based release model. The old 'master'\n\
+branch tried to be both bleeding edge and stable at the same time,\n\
+which caused updates to sometimes break working installs. The new\n\
+structure separates the two:\n\
+\n\
+  * beta   — feature-complete, user-tested releases. Where you'll\n\
+             get bug fixes and validated features.\n\
+  * alpha  — where new features land for tester feedback before\n\
+             graduating to beta. (Optional, for testers.)\n\
+\n\
+Master is frozen at its current state so anyone still installing from\n\
+it can't be accidentally broken by an incoming change. It receives no\n\
+further updates.\n\
+\n\
+To migrate to the beta channel:\n\
 \n\
   1. Edit  /media/fat/downloader.ini  and remove the two lines:\n\
        [retrarr]\n\
        db_url = .../retrarr/master/db/retrarr.json\n\
 \n\
-  2. Install the new drop-in registration file:\n\
+  2. Install the drop-in registration file:\n\
        wget -O /media/fat/downloader_retrarr.ini \\\\\n\
          https://raw.githubusercontent.com/whill121980/retrarr/beta/downloader_retrarr.ini\n\
 \n\
   3. Run update_all from the Scripts menu.\n\
 \n\
-Press OK to continue using this deprecated build." 24 78
+Press OK to continue using this deprecated build." 36 80
 }
 
 bootstrap_deps () {
