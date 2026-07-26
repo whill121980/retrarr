@@ -64,39 +64,59 @@ links, and verification instructions are in
 
 ## Installation
 
-### Option 1: Automatic (via downloader.ini)
+> ⚠️ **This is the alpha channel** — features under active testing.
+> Expect breakage. Use [`beta`](https://github.com/whill121980/retrarr/tree/beta)
+> for feature-complete releases.
 
-Add the following to `/media/fat/downloader.ini` on your MiSTer:
+### Recommended — drop-in `downloader.ini` file
+
+Drop this file into `/media/fat/` on your MiSTer; `update_all` picks it up
+alongside your existing `downloader.ini`. No editing of shared config.
+
+**Option A — one-liner from SSH:**
+
+```bash
+wget https://raw.githubusercontent.com/whill121980/retrarr/alpha/downloader_retrarr.ini \
+  -O /media/fat/downloader_retrarr.ini
+```
+
+Then run `update_all` from the Scripts menu.
+
+**Option B — create manually:**
+
+Create `/media/fat/downloader_retrarr.ini` with these two lines:
 
 ```ini
 [retrarr]
-db_url = https://raw.githubusercontent.com/whill121980/retrarr/master/db/retrarr.json
+db_url = https://raw.githubusercontent.com/whill121980/retrarr/alpha/db/retrarr.json
 ```
 
-The next time `update_all` or `downloader` runs, Retrarr and its dependencies will be installed automatically.
+Then run `update_all`.
 
-### Option 2: Manual
+### Fully manual (no `update_all`)
 
-SSH into your MiSTer and run the following:
+SSH into your MiSTer and copy `retrarr.sh` directly:
 
 ```bash
-# 1. Bootstrap pip (not installed by default)
-python3 -m ensurepip
-
-# 2. Upgrade pip to latest
-pip3 install --upgrade pip
-
-# 3. Install the internetarchive CLI
-pip3 install internetarchive
-
-# 4. Copy retrarr.sh to your MiSTer (from your PC)
-#    scp retrarr.sh root@<mister-ip>:/media/fat/Scripts/
-
-# 5. Run it
+scp retrarr.sh root@<mister-ip>:/media/fat/Scripts/
 /media/fat/Scripts/retrarr.sh
 ```
 
-All other dependencies (`zsh`, `curl`, `dialog`, `python3`, `xmllint`, `7zr`, `unzip`, `jq`, `bc`, `numfmt`, `openssl`, `sha1sum`) are pre-installed on stock MiSTer.
+On first launch, Retrarr installs its Python dependency
+(`internetarchive`) automatically — no manual `pip` commands required.
+
+If you'd rather pre-install or diagnose a failed bootstrap, the commands
+the script runs internally are:
+
+```bash
+python3 -m ensurepip
+pip3 install --upgrade pip
+pip3 install --upgrade internetarchive
+```
+
+All other dependencies (`zsh`, `curl`, `dialog`, `python3`, `xmllint`,
+`7zr`, `unzip`, `jq`, `bc`, `numfmt`, `openssl`, `sha1sum`) are
+pre-installed on stock MiSTer.
 
 On first launch, Retrarr will prompt you to configure your archive.org credentials.
 
