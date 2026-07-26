@@ -73,10 +73,42 @@ Then run `update_all`.
 
 ### Migrating from the deprecated `master` channel
 
-If your `/media/fat/downloader.ini` currently contains a `[retrarr]`
-section pointing at `/master/db/retrarr.json`, remove that section
-first — `update_all` rejects duplicate `db_id: retrarr` registrations,
-so the beta drop-in would fail otherwise.
+Retrarr has moved to a channel-based release model. The old
+single-`master` branch tried to be both bleeding-edge and stable at
+the same time, which caused incoming updates to sometimes break
+working installs. Master is now frozen (no more updates) so anyone
+still installed from it can't be accidentally broken; new work
+lives here on `beta`.
+
+If your `/media/fat/downloader.ini` currently has a `[retrarr]`
+section pointing at `/master/db/retrarr.json`, follow these steps
+to switch to the beta channel:
+
+1. **Remove the master entry** — edit `/media/fat/downloader.ini`
+   and delete the two lines:
+
+   ```ini
+   [retrarr]
+   db_url = https://raw.githubusercontent.com/whill121980/retrarr/master/db/retrarr.json
+   ```
+
+   `update_all` rejects duplicate `db_id: retrarr` registrations, so
+   the beta drop-in would fail if the master entry is still there.
+
+2. **Install the drop-in registration file** (see the Recommended
+   install section above — same as a fresh install):
+
+   ```bash
+   wget https://raw.githubusercontent.com/whill121980/retrarr/beta/downloader_retrarr.ini \
+     -O /media/fat/downloader_retrarr.ini
+   ```
+
+3. **Run `update_all`** from the Scripts menu. It'll pick up the
+   drop-in file and pull the beta channel's current retrarr.sh.
+
+Your existing settings, credentials, and download cache all live
+under `/media/fat/Scripts/.config/retrarr/` and are preserved
+across the migration.
 
 ### Fully manual (no update_all)
 
