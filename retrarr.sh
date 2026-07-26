@@ -1259,6 +1259,9 @@ PYEOF
     local -i elapsed=0
     local -i peer_timeout=90   # cold DHT bootstrap can eat 15-30s alone
     local -i max_wait=300      # hard cap at 5 minutes total
+    local -i stall_window=60   # seconds of zero growth before we call it stalled
+    local -i last_size=0 last_growth=0
+    local -i initial_size=0 initial_logged=0
 
     # Poll until aria2c finishes or we hit a timeout
     while kill -0 $aria_pid 2>/dev/null; do
@@ -1266,14 +1269,42 @@ PYEOF
         local -a check_files=(${bt_dir}/**/${filename}(N))
 
         if [[ -n $check_files ]]; then
-            # File appeared — download is in progress, show progress
             local cur_size=$(wc -c < "${check_files[1]}" 2>/dev/null || print 0)
+
+            # Record initial size at first sight so log lines below make sense
+            # for both cold starts and resumes.
+            if (( ! initial_logged )); then
+                initial_size=$cur_size
+                initial_logged=1
+                log_info "minerva_download_rom: file present at ${elapsed}s (start=$(humanise $initial_size))"
+            fi
+
+            # Growth tracking
+            if (( cur_size > last_size )); then
+                last_size=$cur_size
+                last_growth=$elapsed
+            fi
+
+            # Periodic progress log every 30s
+            if (( elapsed % 30 == 0 )); then
+                local -i gained=$(( cur_size - initial_size ))
+                log_debug "minerva_download_rom: t=${elapsed}s size=$(humanise $cur_size) gained=$(humanise $gained) idle=$(( elapsed - last_growth ))s"
+            fi
+
+            # Stall detection — no growth for stall_window seconds
+            if (( elapsed - last_growth > stall_window )); then
+                log_warn "minerva_download_rom: stalled — no growth for ${stall_window}s (size=$(humanise $cur_size))"
+                kill $aria_pid 2>/dev/null
+                wait $aria_pid 2>/dev/null
+                $DIALOG --title "$TITLE" --msgbox \
+                    "Download stalled for:\n${filename}\n\nNo new data in ${stall_window}s (size $(humanise $cur_size)).\nSwarm may not have the missing pieces right now.\nRetry — verified pieces are preserved." 12 66
+                return 1
+            fi
+
             $DIALOG --title "Downloading: ${filename}" \
-                --infobox "Fetching from Minerva Archive (${torrent_collection_name})...\n\n${filename}\n$(humanise $cur_size) downloaded" 8 78
+                --infobox "Fetching from Minerva Archive (${torrent_collection_name})...\n\n${filename}\n$(humanise $cur_size) present" 8 78
         elif (( elapsed > peer_timeout )); then
-            # No file after peer_timeout seconds — likely a cold swarm.
-            # Keep bt_dir so any partial progress (segment file, DHT-found
-            # peer info) can be reused on the next attempt.
+            # No file at all after peer_timeout — likely a cold swarm.
             log_warn "minerva_download_rom: no peers found after ${peer_timeout}s, aborting"
             kill $aria_pid 2>/dev/null
             wait $aria_pid 2>/dev/null
@@ -1286,8 +1317,7 @@ PYEOF
         fi
 
         if (( elapsed >= max_wait )); then
-            # Hard ceiling. Keep bt_dir so partial pieces persist for resume.
-            log_warn "minerva_download_rom: hard timeout after ${max_wait}s"
+            log_warn "minerva_download_rom: hard timeout after ${max_wait}s (final size=$(humanise $last_size))"
             kill $aria_pid 2>/dev/null
             wait $aria_pid 2>/dev/null
             $DIALOG --title "$TITLE" --msgbox \
