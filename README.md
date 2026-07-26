@@ -127,6 +127,29 @@ Launch the script and use the dialog menu to:
 2. **Browse the game list** -- multi-select with spacebar
 3. **Download** -- progress bars, SHA1 verification, automatic extraction to the correct game directory
 
+### Controller / couch mode
+
+Retrarr can be driven entirely from a controller — launch it from the MiSTer
+Scripts menu, no keyboard required. MiSTer translates controller input into
+keystrokes, so the controls are the same ones you already use in MiSTer's own
+menus:
+
+| Action | Controller | Key |
+|---|---|---|
+| Move through the list, and along the buttons at the bottom | D-Pad | Arrows |
+| Tag / untag a game | X | Space |
+| Press the highlighted button | B | Enter |
+| Back out of the current screen | A | Esc |
+
+Which physical button is which depends on how you've mapped your controller in
+MiSTer's input settings.
+
+**Set up before you sit down.** Controller input can't type, so your
+archive.org credentials have to be configured ahead of time — over SSH, or with
+a USB keyboard attached. Once they're saved, the browse → select → download
+path needs no keyboard at all. The keyword search and custom game directory
+overrides also require typing, so those remain keyboard-only.
+
 ### Settings
 
 Access settings from the main menu (Settings button):
