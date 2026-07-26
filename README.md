@@ -12,16 +12,19 @@ MiSTer-ROMweasel's archive.org identifiers (`nointro.snes`, etc.) went dark. Myr
 
 - **52 supported systems** across Nintendo, Atari, NEC, Sega, SNK, Sony, Commodore, and more
 - **Three download sources:**
-  - **Internet Archive** -- No-Intro ROM sets via `ni-roms` (zip streaming) and CHD/disc images via `ia download` (PlayStation, Saturn, Mega CD, TG16-CD, AO486, CD32)
-  - **Minerva Archive** -- RetroAchievements (hash-verified ROMs), No-Intro (dat-verified dumps), and Redump (disc images) via BitTorrent
-- **Source-separated menus** -- Minerva and Internet Archive are distinct paths with no cross-source merging
+  - **Internet Archive** — No-Intro ROM sets via `ni-roms` (zip streaming) and CHD/disc images via `ia download` (PlayStation, Saturn, Mega CD, TG16-CD, AO486, CD32)
+  - **Minerva Archive** — RetroAchievements (hash-verified ROMs), No-Intro (dat-verified dumps), and Redump (disc images) via BitTorrent, with resumable downloads and stall detection
+- **Source-separated menus** — Minerva and Internet Archive are distinct paths with no cross-source merging
+- **Multi-disc handling** — CD-based games are collapsed into a single picker entry (`[3 discs]`), downloaded together, and placed in per-game subfolders that MiSTer's PSX core needs for automatic disc-swap and per-game virtual memory cards
+- **Skip-if-exists** — re-selecting a game you already have counts as skipped rather than re-downloaded; multi-disc retries are cheap
 - **SHA1 verification** of every Internet Archive download against archive.org metadata
-- **Encrypted credentials** -- archive.org login stored with AES-256-CBC, keyed to your device
-- **Leveled logging** -- `error` / `warn` / `info` / `debug` with automatic rotation
-- **Region and filter options** -- show/hide betas, prototypes, demos, unlicensed titles
-- **AO486 integration** -- auto-generates MGL setnames and per-game configs for the 0MHz DOS Collection
-- **Multi-disc CHD organization** -- automatically groups disc images into per-game subdirectories
-- **Zaparoo integration** -- `--zaparoo` CLI mode for NFC-triggered downloads with progress gauge
+- **Encrypted credentials** — archive.org login stored with AES-256-CBC, keyed to your device
+- **Leveled logging** — `error` / `warn` / `info` / `debug` with automatic rotation and progress logging for long-running torrent downloads
+- **Region and filter options** — show/hide betas, prototypes, demos, unlicensed titles
+- **AO486 integration** — auto-generates MGL setnames and per-game configs for the 0MHz DOS Collection
+- **Zaparoo integration** — `--zaparoo` CLI mode for NFC-triggered downloads with progress gauge
+
+See [`CHANGELOG.md`](CHANGELOG.md) for full version history.
 
 ### Note on Minerva Archive
 
@@ -167,9 +170,9 @@ RETRARR_LOG_LEVEL=debug /media/fat/Scripts/retrarr.sh
 
 ## Roadmap
 
-- **v0.3.x** -- TOSEC collection support, combined-index cross-source filtering, download queue
-- **v0.4** -- Multi-platform support (RetroPie, Bazzite/SteamOS, RetroArch)
-- **v1.0** -- *Arr-style architecture: REST API server, web UI, RetroNAS integration, ScreenScraper metadata
+- **v0.3.x** — Dreamcast (via DreamSTer) with `chdman` CHD→CUE/BIN conversion, DAT-based post-download verification, region filtering by filename convention, TOSEC collection support
+- **v0.4** — Multi-platform unification: single script auto-detects MiSTer / Bazzite / RetroBat / WSL and applies the right folder conventions and dependencies (early ports of Bazzite and WSL already in the repo)
+- **v1.0** — *Arr-style architecture: REST API server, web UI, RetroNAS integration, ScreenScraper metadata, offloaded torrent handling
 
 ## Credits
 
