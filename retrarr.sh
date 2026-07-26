@@ -1810,21 +1810,47 @@ proc.wait()
         fi
     fi
 
+    # Extract to destination. Capture stderr+stdout so the actual error text
+    # survives the next dialog's repaint and lands in the log.
     [[ -d $dest_dir ]] || mkdir -p "$dest_dir"
-    if [[ $ofile == *.7z || $CORE == "AO486" ]]; then
-        $SZR e "$ofile" -o"$dest_dir" -y && rm -f "$ofile"
+    local extract_out extract_ret
+    if [[ $CORE == "AO486" ]]; then
+        # 0MHz DOS Collection files are .zip; extract with unzip so we can
+        # then locate and post-process the .mgl for MiSTer setname handling.
+        extract_out=$($UNZIP -o -d "$dest_dir" "$ofile" 2>&1)
+        extract_ret=$?
+    elif [[ $ofile == *.7z ]]; then
+        extract_out=$($SZR e "$ofile" -o"$dest_dir" -y 2>&1)
+        extract_ret=$?
     elif [[ $ofile == *.zip ]]; then
-        $UNZIP -o -qq -d "$dest_dir" "$ofile"
-        if [[ $CORE == "AO486" ]]; then
-            local mgl=$CORE_GAMEDIR/$($UNZIP -l "$ofile" | grep -o '_DOS Games/.*\.mgl$')
-            ao486_append_setname "$mgl"
-        fi
-        rm -f "$ofile"
+        extract_out=$($UNZIP -o -d "$dest_dir" "$ofile" 2>&1)
+        extract_ret=$?
     else
-        mv "$ofile" "$dest_dir"
+        extract_out=$(mv "$ofile" "$dest_dir" 2>&1)
+        extract_ret=$?
     fi
 
-    log_info "ia_download_rom: complete -> $dest_dir"
+    if (( extract_ret != 0 )); then
+        log_error "ia_download_rom: extract FAILED ($extract_ret) for ${tag##*/}"
+        log_error "ia_download_rom: extract output: $extract_out"
+        $DIALOG --title "Extract failed" --msgbox \
+"Failed to unpack:\n${tag##*/}\n\nExit code: ${extract_ret}\n\n${extract_out}\n\nSee ~/.config/retrarr/retrarr.log for details." 14 72
+        return 1
+    fi
+
+    # AO486 post-processing — .mgl setname insertion so per-game configs work.
+    if [[ $CORE == "AO486" && $ofile == *.zip ]]; then
+        local mgl=$CORE_GAMEDIR/$($UNZIP -l "$ofile" 2>/dev/null | grep -o '_DOS Games/.*\.mgl$')
+        if [[ -f $mgl ]]; then
+            ao486_append_setname "$mgl" 2>&1 | tee -a "$LOG_FILE" >/dev/null
+        else
+            log_warn "ia_download_rom: AO486 .mgl not found after extract (looked for $mgl)"
+        fi
+    fi
+
+    [[ $ofile == *.zip || $ofile == *.7z ]] && rm -f "$ofile"
+
+    log_info "ia_download_rom: extracted ${tag##*/} -> $dest_dir"
     return 0
 }
 
