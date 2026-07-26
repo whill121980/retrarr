@@ -45,41 +45,61 @@ MiSTer-ROMweasel's archive.org identifiers (`nointro.snes`, etc.) went dark. Myr
 
 ## Installation
 
-### Option 1: Automatic (via downloader.ini)
+### Recommended — drop-in downloader.ini file
 
-Add the following to `/media/fat/downloader.ini` on your MiSTer:
+Retrarr ships a ready-to-use downloader registration file. Drop it into
+`/media/fat/` on your MiSTer and `update_all` picks it up alongside your
+existing `downloader.ini` — no editing of shared config.
+
+**Option A — one-liner from SSH:**
+
+```bash
+wget https://raw.githubusercontent.com/whill121980/retrarr/beta/downloader_retrarr.ini \
+  -O /media/fat/downloader_retrarr.ini
+```
+
+Then run `update_all` from the Scripts menu.
+
+**Option B — create manually:**
+
+Create `/media/fat/downloader_retrarr.ini` with these two lines:
 
 ```ini
 [retrarr]
-db_url = https://raw.githubusercontent.com/whill121980/retrarr/master/db/retrarr.json
+db_url = https://raw.githubusercontent.com/whill121980/retrarr/beta/db/retrarr.json
 ```
 
-The next time `update_all` or `downloader` runs, Retrarr and its dependencies will be installed automatically.
+Then run `update_all`.
 
-### Option 2: Manual
+### Migrating from the deprecated `master` channel
 
-SSH into your MiSTer and run the following:
+If your `/media/fat/downloader.ini` currently contains a `[retrarr]`
+section pointing at `/master/db/retrarr.json`, remove that section
+first — `update_all` rejects duplicate `db_id: retrarr` registrations,
+so the beta drop-in would fail otherwise.
+
+### Fully manual (no update_all)
+
+SSH into your MiSTer and run:
 
 ```bash
-# 1. Bootstrap pip (not installed by default)
 python3 -m ensurepip
-
-# 2. Upgrade pip to latest
 pip3 install --upgrade pip
-
-# 3. Install the internetarchive CLI
 pip3 install internetarchive
 
-# 4. Copy retrarr.sh to your MiSTer (from your PC)
-#    scp retrarr.sh root@<mister-ip>:/media/fat/Scripts/
+# Copy retrarr.sh to your MiSTer (from your PC)
+scp retrarr.sh root@<mister-ip>:/media/fat/Scripts/
 
-# 5. Run it
+# Run it
 /media/fat/Scripts/retrarr.sh
 ```
 
-All other dependencies (`zsh`, `curl`, `dialog`, `python3`, `xmllint`, `7zr`, `unzip`, `jq`, `bc`, `numfmt`, `openssl`, `sha1sum`) are pre-installed on stock MiSTer.
+All other dependencies (`zsh`, `curl`, `dialog`, `python3`, `xmllint`,
+`7zr`, `unzip`, `jq`, `bc`, `numfmt`, `openssl`, `sha1sum`) are
+pre-installed on stock MiSTer.
 
-On first launch, Retrarr will prompt you to configure your archive.org credentials.
+On first launch, Retrarr will prompt you to configure your archive.org
+credentials.
 
 ## Usage
 
@@ -151,10 +171,8 @@ RETRARR_LOG_LEVEL=debug /media/fat/Scripts/retrarr.sh
 
 ## Roadmap
 
-- **v0.2.x** -- Region filtering, multi-disc PSX testing, CD32 validation
-- **v0.3** -- Resume interrupted downloads, controller/gamepad navigation, download queue
-- **v0.4** -- Multi-platform support (RetroPie, Bazzite/SteamOS, RetroArch)
-- **v1.0** -- *Arr-style architecture: REST API server, web UI, RetroNAS integration, ScreenScraper metadata
+See [`CHANGELOG.md`](CHANGELOG.md) for version history. Forward plans
+are tracked in [GitHub Issues](https://github.com/whill121980/retrarr/issues).
 
 ## Credits
 
