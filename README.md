@@ -21,11 +21,22 @@
 > **To migrate to the beta channel:**
 > 1. Edit `/media/fat/downloader.ini` and remove the `[retrarr]`
 >    section (two lines pointing at `/master/db/retrarr.json`)
-> 2. Install the drop-in registration file:
->    ```bash
->    wget -O /media/fat/downloader_retrarr.ini \
->      https://raw.githubusercontent.com/whill121980/retrarr/beta/downloader_retrarr.ini
->    ```
+> 2. Copy the drop-in registration file
+>    [`downloader_retrarr.ini`](downloader_retrarr.ini) (also in this
+>    branch — same file as beta) into `/media/fat/` on your MiSTer.
+>    Any of these paths work:
+>    - **SSH one-liner (from master):**
+>      ```bash
+>      wget -O /media/fat/downloader_retrarr.ini \
+>        https://raw.githubusercontent.com/whill121980/retrarr/master/downloader_retrarr.ini
+>      ```
+>    - **SSH one-liner (from beta):**
+>      ```bash
+>      wget -O /media/fat/downloader_retrarr.ini \
+>        https://raw.githubusercontent.com/whill121980/retrarr/beta/downloader_retrarr.ini
+>      ```
+>    - **Drag & drop:** grab the file from either branch on GitHub
+>      and copy it to `/media/fat/` on the SD card
 > 3. Run `update_all` from the Scripts menu.
 >
 > Full install docs are on the [beta branch's README](https://github.com/whill121980/retrarr/blob/beta/README.md).
