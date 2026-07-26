@@ -1,4 +1,23 @@
-# Retrarr (Retro Retriever)
+# Retrarr (Retro Retriever) — `master` branch (deprecated)
+
+> ⚠️ **This branch is deprecated and frozen.** Retrarr now lives on the
+> [`beta`](https://github.com/whill121980/retrarr/tree/beta) branch. The
+> existing `master` install continues to work but will not receive
+> updates or bug fixes.
+>
+> **To migrate:**
+> 1. Edit `/media/fat/downloader.ini` and remove the `[retrarr]` section
+>    (two lines pointing at `/master/db/retrarr.json`)
+> 2. Install the new drop-in registration file:
+>    ```bash
+>    wget -O /media/fat/downloader_retrarr.ini \
+>      https://raw.githubusercontent.com/whill121980/retrarr/beta/downloader_retrarr.ini
+>    ```
+> 3. Run `update_all` from the Scripts menu.
+>
+> Full install docs are on the [beta branch's README](https://github.com/whill121980/retrarr/blob/beta/README.md).
+
+---
 
 A ROM and disc image downloader for [MiSTer FPGA](https://mister-devel.github.io/MkDocs_MiSTer/), built as a spiritual successor to [MiSTer-ROMweasel](https://github.com/Koston-0xDEADBEEF/MiSTer-ROMweasel).
 

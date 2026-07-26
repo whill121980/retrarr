@@ -647,6 +647,34 @@ PYEOF
     print "$result"
 }
 
+# Show a one-time-per-launch notice that the master install channel is
+# deprecated. Purely informational — we do not touch downloader.ini,
+# do not delete files, do not rewrite anything. The user acknowledges
+# with OK and continues using this (deprecated) build normally.
+show_master_deprecation () {
+    log_info "master deprecation notice shown"
+    $DIALOG --title "Retrarr — install channel deprecated" --msgbox \
+"You are running Retrarr from the deprecated 'master' install\n\
+channel. This branch is frozen — no future updates or bug fixes\n\
+will land here.\n\
+\n\
+The current version continues to work; this notice is informational.\n\
+\n\
+To move to the new 'beta' channel and receive updates:\n\
+\n\
+  1. Edit  /media/fat/downloader.ini  and remove the two lines:\n\
+       [retrarr]\n\
+       db_url = .../retrarr/master/db/retrarr.json\n\
+\n\
+  2. Install the new drop-in registration file:\n\
+       wget -O /media/fat/downloader_retrarr.ini \\\\\n\
+         https://raw.githubusercontent.com/whill121980/retrarr/beta/downloader_retrarr.ini\n\
+\n\
+  3. Run update_all from the Scripts menu.\n\
+\n\
+Press OK to continue using this deprecated build." 24 78
+}
+
 bootstrap_deps () {
     # Check if internetarchive CLI is installed; if not, offer to install it
     [[ -n $IA ]] && return 0
@@ -1944,6 +1972,11 @@ main () {
         zaparoo_mode "$2" "$3"
         return $?
     fi
+
+    # Interactive path — surface the master-channel deprecation notice
+    # once per launch so users know how to migrate. Nothing on their
+    # system is modified; they acknowledge and proceed normally.
+    show_master_deprecation
 
     bootstrap_deps
     check_ia
