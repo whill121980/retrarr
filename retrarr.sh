@@ -1819,7 +1819,7 @@ download_roms () {
         mkdir -p "$CORE_GAMEDIR"
     fi
 
-    local ok=0 fail=0
+    local ok=0 fail=0 skipped=0
     local active_source=${CORE_ACTIVE_SOURCE:-$CORE_BACKEND}
     for tag in $tags; do
         local dest
@@ -1840,6 +1840,20 @@ download_roms () {
                 ;;
         esac
         log_debug "download_roms: dest='$dest'"
+
+        # Skip if this game already exists at the destination. Strip archive
+        # extensions from the tag's filename to derive the base and glob
+        # against the dest folder — the extracted file may be a .chd even
+        # though the source tag ended in .zip.
+        local _fname=${tag##*/}
+        local _basename=${${${_fname%.zip}%.7z}%.chd}
+        local -a _existing=("${dest}/${_basename}"*(N))
+        if [[ -n $_existing ]]; then
+            log_info "download_roms: skipping (already present) — ${_existing[1]}"
+            (( ++skipped ))
+            continue
+        fi
+
         [[ -n $dest && ! -d $dest ]] && mkdir -p "$dest"
 
         case $active_source in
@@ -1868,6 +1882,7 @@ download_roms () {
     done
 
     local msg="${ok} download(s) complete"
+    [[ $skipped -gt 0 ]] && msg+=", ${skipped} skipped (already present)"
     [[ $fail -gt 0 ]] && msg+=", ${fail} failed"
     $DIALOG --title "$TITLE" --cr-wrap --msgbox "${msg}\n\nPress OK to return." 8 40
     [[ $? -ne $DIALOG_OK ]] && cleanup
