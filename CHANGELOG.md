@@ -14,6 +14,36 @@ Sections used:
 
 Nothing yet.
 
+## [0.3.6] — 2026-07-26
+
+Adds SEGA Dreamcast support via both Minerva Redump and IA.
+
+### Added
+
+- `DC` core — SEGA Dreamcast
+- Minerva side: `REDUMP_DIR[DC] = "Sega - Dreamcast"` maps to
+  Minerva's Redump Dreamcast collection (BIN+CUE inside .zip,
+  verified)
+- IA side: `DC_BACKEND="ia"` + `DC_IA_IDENTIFIER="sega-dreamcast-redump"`
+  — 1517-game Redump-sourced set, `.zip` containing multi-track
+  BIN+CUE (verified by pulling one zip's central directory). Byte-
+  for-byte the same content as Minerva, just via `ia download`
+  instead of BitTorrent
+- `DC_GAMEDIR_DEFAULT = "/media/fat/games/Dreamcast"` — matches
+  DreamSTer's expected content path (and transfers cleanly to the
+  Bazzite/WSL ports later)
+- DC added to `is_cd_core()` so multi-track BIN+CUE downloads land
+  in per-game subfolders
+
+### Notes
+
+- `.zip` extract path in `ia_download_rom` (retrarr.sh:1832) already
+  handles this format — no code change beyond the config block
+- RA `.chd` subset deferred: needs both chdman bundled AND
+  DreamSTer-side RA support (neither exists yet)
+- BIOS files (`dc_boot.bin`, `dc_flash.bin`, `emu.cfg`) remain the
+  user's responsibility
+
 ## [0.3.5] — 2026-07-26
 
 Alpha channel established. Rolling development branch for new

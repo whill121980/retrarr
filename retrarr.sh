@@ -1,5 +1,5 @@
 #!/bin/zsh
-# retrarr.sh — Retro Retriever v0.3.5
+# retrarr.sh — Retro Retriever v0.3.6
 # Spiritual successor to MiSTer-ROMweasel by Koston-0xDEADBEEF
 #
 # Sources:
@@ -23,7 +23,7 @@ autoload zmv
 # ─── STATIC GLOBALS ────────────────────────────────────────────────────────────
 
 init_static_globals () {
-    typeset -gr RETRARR_VERSION="Retro Retriever v0.3.5"
+    typeset -gr RETRARR_VERSION="Retro Retriever v0.3.6"
 
     # Required binaries
     typeset -gr XMLLINT=$(which xmllint)  || { print -u2 "ERROR: xmllint not found"  ; return 1 }
@@ -145,6 +145,7 @@ init_static_globals () {
         "S32X"       "SEGA 32X"                            \
         "MCD"        "SEGA MegaCD / SegaCD"                \
         "SS"         "SEGA Saturn"                         \
+        "DC"         "SEGA Dreamcast"                      \
         "NGP"        "SNK Neo Geo Pocket"                  \
         "NGPC"       "SNK Neo Geo Pocket Color"            \
         "PSXUS"      "Sony PlayStation USA"                \
@@ -466,6 +467,7 @@ init_static_globals () {
         TG16CD    "NEC - PC Engine CD & TurboGrafx CD"
         MCD       "Sega - Mega CD & Sega CD"
         SS        "Sega - Saturn"
+        DC        "Sega - Dreamcast"
         PSX       "Sony - PlayStation"
         CD32      "Commodore - Amiga CD32"
     )
@@ -495,6 +497,17 @@ init_static_globals () {
     typeset -gr SS_FILES_XML="chd_saturn_files.xml"
     typeset -gr SS_META_XML="chd_saturn_meta.xml"
     typeset -gr SS_GAMEDIR_DEFAULT="/media/fat/games/Saturn"
+
+    # DC — Sega Dreamcast. Both IA and Minerva ship the identical Redump
+    # BIN+CUE dumps in .zip (verified: multi-track .bin plus one .cue per
+    # game). DreamSTer reads .cue/.gdi/.cdi from this folder recursively,
+    # so per-game subfolders work fine. No chdman path yet — RA subset is
+    # deferred until both chdman ships and DreamSTer gets RA support.
+    typeset -gr DC_BACKEND="ia"
+    typeset -gr DC_IA_IDENTIFIER="sega-dreamcast-redump"
+    typeset -gr DC_FILES_XML="sega-dreamcast-redump_files.xml"
+    typeset -gr DC_META_XML="sega-dreamcast-redump_meta.xml"
+    typeset -gr DC_GAMEDIR_DEFAULT="/media/fat/games/Dreamcast"
 
     typeset -gr PSXUS_BACKEND="ia"
     typeset -gr PSXUS_IA_IDENTIFIER="chd_psx"
@@ -1519,7 +1532,7 @@ get_rom_info () {
 # cores expect multi-disc siblings to share one folder for disc-swap).
 is_cd_core () {
     case $CORE in
-        PSXUS|PSXEU|PSXJP|PSXJP2|PSXMISC|PSX|MCD|SS|TG16CD|CD32) return 0 ;;
+        PSXUS|PSXEU|PSXJP|PSXJP2|PSXMISC|PSX|MCD|SS|DC|TG16CD|CD32) return 0 ;;
         *) return 1 ;;
     esac
 }
