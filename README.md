@@ -222,16 +222,14 @@ in time for a first stable release.
 
 ## Credits
 
-- Inspired by [MiSTer-ROMweasel](https://github.com/Koston-0xDEADBEEF/MiSTer-ROMweasel) by Koston-0xDEADBEEF
-- Built for the [MiSTer FPGA](https://mister-devel.github.io/MkDocs_MiSTer/) community
 - Bundled binaries (see [`bin/README.md`](bin/README.md) for full attribution):
   - [`aria2`](https://github.com/aria2/aria2) — BitTorrent + multi-connection HTTP downloader used for the Minerva path. ARM static build from [abcfy2/aria2-static-build](https://github.com/abcfy2/aria2-static-build)
   - [`chdman`](https://github.com/mamedev/mame) (part of MAME) — CHD ↔ CUE/BIN converter, staged for a future release. Static build from [emmercm/chdman-js](https://github.com/emmercm/chdman-js)
 - Source hosts:
   - [Internet Archive](https://archive.org) — No-Intro (`ni-roms`) and CHD/Redump items
   - [Minerva Archive](https://minerva-archive.org) — RetroAchievements, No-Intro, and Redump BitTorrent collections
-- Cores this integrates with directly:
-  - [DreamSTer](https://github.com/skmp/DreamSTer) by skmp — MiSTer Dreamcast core, target of the DC path
+- Inspired by [MiSTer-ROMweasel](https://github.com/Koston-0xDEADBEEF/MiSTer-ROMweasel) by Koston-0xDEADBEEF
+- Built for the [MiSTer FPGA](https://mister-devel.github.io/MkDocs_MiSTer/) community
 
 ## License
 
