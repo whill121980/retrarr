@@ -1240,9 +1240,10 @@ PYEOF
         --select-file=$file_index
         --dir="$bt_dir"
         --seed-time=0
-        --bt-stop-timeout=90
         --bt-tracker-connect-timeout=15
         --bt-tracker-timeout=30
+        --bt-max-peers=100
+        --bt-request-peer-speed-limit=500K
         --file-allocation=none
         --console-log-level=error
         --download-result=hide
@@ -1270,13 +1271,14 @@ PYEOF
             $DIALOG --title "Downloading: ${filename}" \
                 --infobox "Fetching from Minerva Archive (${torrent_collection_name})...\n\n${filename}\n$(humanise $cur_size) downloaded" 8 78
         elif (( elapsed > peer_timeout )); then
-            # No file after peer_timeout seconds — no seeders
+            # No file after peer_timeout seconds — likely a cold swarm.
+            # Keep bt_dir so any partial progress (segment file, DHT-found
+            # peer info) can be reused on the next attempt.
             log_warn "minerva_download_rom: no peers found after ${peer_timeout}s, aborting"
             kill $aria_pid 2>/dev/null
             wait $aria_pid 2>/dev/null
-            rm -rf "$bt_dir"
             $DIALOG --title "$TITLE" --msgbox \
-                "No seeders found for:\n${filename}\n\nMinerva Archive torrents may not have active peers.\nTry again later or use Internet Archive." 10 64
+                "No peers reached for:\n${filename}\n\nSwarm may be cold. Retry — piece progress and DHT peer info are preserved." 10 64
             return 1
         else
             $DIALOG --title "Downloading: ${filename}" \
@@ -1284,12 +1286,12 @@ PYEOF
         fi
 
         if (( elapsed >= max_wait )); then
+            # Hard ceiling. Keep bt_dir so partial pieces persist for resume.
             log_warn "minerva_download_rom: hard timeout after ${max_wait}s"
             kill $aria_pid 2>/dev/null
             wait $aria_pid 2>/dev/null
-            rm -rf "$bt_dir"
             $DIALOG --title "$TITLE" --msgbox \
-                "Download timed out for:\n${filename}\n\nTry again later." 8 60
+                "Download timed out for:\n${filename}\n\nRetry — partial pieces are preserved and the next attempt will resume." 10 64
             return 1
         fi
         sleep 1
@@ -1304,10 +1306,10 @@ PYEOF
     # length on disk but with zeroed holes where missing pieces belong. Refuse
     # to hand that to unzip / mv — it looks like a valid file but isn't.
     if (( aria_ret != 0 )); then
+        # Keep bt_dir so a retry resumes from verified pieces instead of zero.
         log_error "minerva_download_rom: aria2c exit=$aria_ret — download incomplete for $filename"
-        rm -rf "$bt_dir"
         $DIALOG --title "$TITLE" --msgbox \
-            "Torrent download for:\n${filename}\n\nended incomplete (aria2c exit=${aria_ret}).\nSome pieces did not verify. Try again in a moment — the swarm may pick up." 12 66
+            "Torrent download for:\n${filename}\n\nended incomplete (aria2c exit=${aria_ret}).\nRetry — verified pieces are preserved and the next attempt resumes." 12 66
         return 1
     fi
 
@@ -1316,21 +1318,19 @@ PYEOF
     local -a found_files=(${bt_dir}/**/${filename}(N))
     if [[ -z $found_files ]]; then
         log_error "minerva_download_rom: file not found after torrent download"
-        rm -rf "$bt_dir"
         $DIALOG --title "$TITLE" --msgbox \
-            "Torrent download failed for:\n${filename}\n\nNo seeders may be available. Try again later." 9 60
+            "Torrent download failed for:\n${filename}\n\nRetry — segment file is preserved." 9 60
         return 1
     fi
 
     local ofile="${found_files[1]}"
     log_debug "minerva_download_rom: found at $ofile ($(wc -c < "$ofile" 2>/dev/null) bytes)"
 
-    # Move only the target file to cache dir — discard any piece-boundary spillover
+    # Move only the target file to cache dir. Leave bt_dir intact — the
+    # .aria2 segment file lets future downloads from the same torrent resume
+    # from verified pieces instead of starting from zero.
     mv "$ofile" "${CACHE_DIR}/${filename}"
     ofile="${CACHE_DIR}/${filename}"
-
-    # Clean up torrent working directory (removes partial spillover files)
-    rm -rf "$bt_dir"
 
     # Extract to destination. Capture stderr+stdout so real errors survive
     # the dialog repaint and land in the log.

@@ -1,10 +1,10 @@
 {
   "db_id": "retrarr",
-  "timestamp": 1785027166,
+  "timestamp": 1785027821,
   "files": {
     "Scripts/retrarr.sh": {
-      "hash": "df41b21926a2295e2809c7193e588bfa",
-      "size": 104848,
+      "hash": "45acbe79f06b9394f7a3c955e0e978ef",
+      "size": 105133,
       "url": "https://raw.githubusercontent.com/whill121980/retrarr/devel/retrarr.sh"
     },
     "Scripts/.retrarr/aria2c": {
