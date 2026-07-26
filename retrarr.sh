@@ -1,5 +1,5 @@
 #!/bin/zsh
-# retrarr.sh — Retro Retriever v0.3.3
+# retrarr.sh — Retro Retriever v0.3.4
 # Spiritual successor to MiSTer-ROMweasel by Koston-0xDEADBEEF
 #
 # Sources:
@@ -23,7 +23,7 @@ autoload zmv
 # ─── STATIC GLOBALS ────────────────────────────────────────────────────────────
 
 init_static_globals () {
-    typeset -gr RETRARR_VERSION="Retro Retriever v0.3.3"
+    typeset -gr RETRARR_VERSION="Retro Retriever v0.3.4"
 
     # Required binaries
     typeset -gr XMLLINT=$(which xmllint)  || { print -u2 "ERROR: xmllint not found"  ; return 1 }
@@ -1484,6 +1484,32 @@ get_rom_info () {
 
 # ─── GAME DESTINATION ──────────────────────────────────────────────────────────
 
+# CD-based cores need per-game subfolders (PSX needs it for per-game virtual
+# memory cards; the other CD cores tolerate/prefer it too and all MiSTer CD
+# cores expect multi-disc siblings to share one folder for disc-swap).
+is_cd_core () {
+    case $CORE in
+        PSXUS|PSXEU|PSXJP|PSXJP2|PSXMISC|PSX|MCD|SS|TG16CD|CD32) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Strip path, extension, and (Disc N) marker from a tag. What remains is the
+# per-game folder name shared by all discs of a set. Every OTHER tag in the
+# filename — (USA), (Rev 2), (Alt), etc. — is preserved.
+strip_to_gamebase () {
+    setopt localoptions extendedglob
+    local name=${1##*/}
+    name=${name%.(chd|zip|7z)}
+    # Remove the disc marker in place — don't chop everything after it.
+    name=${name/ \(Disc [0-9AB]\)/}
+    # Collapse any runs of spaces that removal left behind, and trim edges.
+    name=${name// ##/ }
+    name=${name## }
+    name=${name%% }
+    print -r -- "$name"
+}
+
 get_rom_gamedir () {
     setopt localoptions extendedglob
     local tag=$*
@@ -1799,9 +1825,19 @@ download_roms () {
         local dest
         log_debug "download_roms: tag='$tag' source=$active_source"
         case $active_source in
-            ra|ni_minerva|redump)  dest="$CORE_GAMEDIR" ;;
-            ni)                    dest="$CORE_GAMEDIR" ;;
-            ia)                    dest=$(get_rom_gamedir "$tag") ;;
+            ra|ni_minerva|redump)
+                if is_cd_core; then
+                    dest="${CORE_GAMEDIR}/$(strip_to_gamebase "$tag")"
+                else
+                    dest="$CORE_GAMEDIR"
+                fi
+                ;;
+            ni)
+                dest="$CORE_GAMEDIR"
+                ;;
+            ia)
+                dest=$(get_rom_gamedir "$tag")
+                ;;
         esac
         log_debug "download_roms: dest='$dest'"
         [[ -n $dest && ! -d $dest ]] && mkdir -p "$dest"
@@ -1973,6 +2009,39 @@ game_menu () {
         fi
     fi
 
+    # Multi-disc collapse — one menu row per game instead of one per disc.
+    # Real disc tags are stashed in DISC_GROUPS keyed by a synthetic
+    # __MULTIDISC__<basekey> tag we insert into the list. Applied after the
+    # subdir filter so __MULTIDISC__ prefixes don't confuse subdir extraction.
+    typeset -A DISC_GROUPS=()
+    if is_cd_core; then
+        local -a _grouped=()
+        typeset -A _dseen=()
+        local _t _base _bkey _fname
+        for _t in $all_tags; do
+            _fname=${_t##*/}
+            _base=$(strip_to_gamebase "$_t")
+            # Extension-stripped filename that matches base means no disc marker.
+            local _nameNoExt=${_fname%.(chd|zip|7z)}
+            if [[ "$_nameNoExt" != "$_base" ]]; then
+                if [[ $_t == */* ]]; then
+                    _bkey="${_t%/*}/${_base}"
+                else
+                    _bkey="$_base"
+                fi
+                DISC_GROUPS[$_bkey]+="${_t}"$'\x00'
+                if [[ -z ${_dseen[$_bkey]} ]]; then
+                    _dseen[$_bkey]=1
+                    _grouped+=("__MULTIDISC__${_bkey}")
+                fi
+            else
+                _grouped+=($_t)
+            fi
+        done
+        all_tags=($_grouped)
+        unset _grouped _dseen _t _base _bkey _fname _nameNoExt
+    fi
+
     while true; do
         if [[ -z $selected_tags ]]; then
             [[ -n $filter ]] \
@@ -1985,7 +2054,14 @@ game_menu () {
         for (( i=1; i<=${#menu_tags}; ++i )); do
             (( ${selected_tags[(Ie)${menu_tags[$i]}]} )) && st="On" || st="0"
             $JOY_MODE && unset st
-            local display=${${menu_tags[$i]##*/}%.(7z|zip|chd)}
+            local display
+            if [[ ${menu_tags[$i]} == __MULTIDISC__* ]]; then
+                local _bkey=${menu_tags[$i]#__MULTIDISC__}
+                local -a _discs=(${(ps:\x00:)DISC_GROUPS[$_bkey]})
+                display="${_bkey##*/} [${#_discs} discs]"
+            else
+                display=${${menu_tags[$i]##*/}%.(7z|zip|chd)}
+            fi
             menu_items+=(${menu_tags[$i]} ${display:0:$itemwidth} $st)
         done
 
@@ -2021,7 +2097,20 @@ game_menu () {
                     $DIALOG --title "$TITLE" --msgbox "No ROMs selected!" 0 0
                     continue
                 }
-                download_roms $selected_tags
+                # Expand __MULTIDISC__ synthetic tags back into their real
+                # per-disc tags before handing them to download_roms.
+                local -a _expanded=()
+                local _st _bkey
+                for _st in $selected_tags; do
+                    if [[ $_st == __MULTIDISC__* ]]; then
+                        _bkey=${_st#__MULTIDISC__}
+                        _expanded+=(${(ps:\x00:)DISC_GROUPS[$_bkey]})
+                    else
+                        _expanded+=($_st)
+                    fi
+                done
+                download_roms $_expanded
+                unset _expanded _st _bkey
                 $JOY_MODE || unset selected_tags filter
                 continue ;;
             $DIALOG_HELP)
@@ -2051,7 +2140,20 @@ game_menu () {
                     $DIALOG --title "$TITLE" --msgbox "No ROMs selected!" 0 0
                     continue
                 }
-                rominfo="$(get_rom_info $selected_tags)"
+                # Expand __MULTIDISC__ synthetic tags so ROM info reflects
+                # every disc in the set, not the (nonexistent) synthetic file.
+                local -a _info_tags=()
+                local _st _bkey
+                for _st in $selected_tags; do
+                    if [[ $_st == __MULTIDISC__* ]]; then
+                        _bkey=${_st#__MULTIDISC__}
+                        _info_tags+=(${(ps:\x00:)DISC_GROUPS[$_bkey]})
+                    else
+                        _info_tags+=($_st)
+                    fi
+                done
+                rominfo="$(get_rom_info $_info_tags)"
+                unset _info_tags _st _bkey
                 $DIALOG --title "ROM Info" --clear --cr-wrap --colors \
                     --msgbox "$rominfo" $(( $MAXHEIGHT / 2 )) $MAXWIDTH
                 [[ $? -ne $DIALOG_OK ]] && cleanup
