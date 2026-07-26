@@ -53,14 +53,13 @@ Minerva Archive is a community-driven project that serves files via BitTorrent. 
 
 ### Bundled third-party binaries
 
-Retrarr's install brings along two prebuilt static ARM binaries that MiSTer's
+Retrarr's install brings along one prebuilt static ARM binary that MiSTer's
 Buildroot userland doesn't ship: `aria2c` (torrent downloader, needed for
-Minerva Archive sources) and `chdman` (CD image converter, needed to normalize
-CHD downloads to the formats some cores require). Both are sourced verbatim
-from public upstreams — no patches, no repackaging. Full attribution, source
-links, and verification instructions are in
-[`bin/README.md`](bin/README.md). Every binary is size- and md5-pinned in
-`db/retrarr.json`, so `update_all` rejects any file that doesn't match.
+Minerva Archive sources). Sourced verbatim from a public upstream — no
+patches, no repackaging. Full attribution, source links, and verification
+instructions are in [`bin/README.md`](bin/README.md). The binary is size-
+and md5-pinned in `db/retrarr.json`, so `update_all` rejects any file that
+doesn't match.
 
 ## Installation
 
@@ -194,21 +193,11 @@ Grouped by readiness, not by version. Features get resequenced routinely
 and version-pinning turns plans into broken commitments the moment
 priorities shift.
 
-**In progress**
-- Dreamcast — Minerva Redump + IA both shipped in v0.3.6; RA `.chd`
-  subset waits on `chdman` and DC core-side RA support
-- PSX Redump — unified set vs the 5 IA split regions, needs mapping
-- Zaparoo source preference (currently IA-only)
-
 **Ready — no blocking dependencies**
 - Filtering (Tier 1) — regex-based region filtering from
   No-Intro/Redump filename tags, no external data needed
-- `chdman` bundling — ARM static build already sourced (see
-  [`bin/README.md`](bin/README.md)); unlocks any IA-CHD-only source
-  and the RA subset for DC/PSX/etc.
 - Multi-platform unification — single script auto-detects
   MiSTer/Bazzite/RetroBat/WSL and applies the right folder conventions
-  (Bazzite and WSL ports already in-repo as separate scripts)
 
 **Waiting on external data**
 - Filtering (Tier 2, DAT integration) — cache No-Intro + Redump DATs
@@ -224,7 +213,6 @@ in time for a first stable release.
 
 - Bundled binaries (see [`bin/README.md`](bin/README.md) for full attribution):
   - [`aria2`](https://github.com/aria2/aria2) — BitTorrent + multi-connection HTTP downloader used for the Minerva path. ARM static build from [abcfy2/aria2-static-build](https://github.com/abcfy2/aria2-static-build)
-  - [`chdman`](https://github.com/mamedev/mame) (part of MAME) — CHD ↔ CUE/BIN converter, staged for a future release. Static build from [emmercm/chdman-js](https://github.com/emmercm/chdman-js)
 - Source hosts:
   - [Internet Archive](https://archive.org) — No-Intro (`ni-roms`) and CHD/Redump items
   - [Minerva Archive](https://minerva-archive.org) — RetroAchievements, No-Intro, and Redump BitTorrent collections

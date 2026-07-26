@@ -56,36 +56,6 @@ Installed to `Scripts/.retrarr/aria2c` on the MiSTer. Retrarr checks
 
 ---
 
-## `chdman-mister` — CHD ↔ CUE/BIN converter (planned, not yet bundled)
-
-> **Status:** researched and staged, not yet added to this branch.
-> The section below documents the intended source/version so the
-> bundling PR can proceed cleanly when Dreamcast support lands.
-
-Intended use: convert Dreamcast (and other CD-format) downloads from
-CHD to formats accepted by cores that don't read CHD natively (e.g.
-DreamSTer wants `.cue`/`.gdi`/`.cdi`).
-
-- **Upstream project:** [mamedev/mame](https://github.com/mamedev/mame)
-  (chdman is part of MAME)
-- **License:** GPL v2. From MAME's `COPYING`: *"MAME as a whole is made
-  available under the terms of the GNU General Public License version 2."*
-  See [`mame/COPYING`](https://github.com/mamedev/mame/blob/master/COPYING)
-- **Source code:** available at the upstream project link above
-- **Static-build repo (source of this binary):**
-  [emmercm/chdman-js](https://github.com/emmercm/chdman-js)
-  — Node.js wrapper (GPLv3) that ships prebuilt static chdman binaries
-- **Version:** MAME `0.288.1` (chdman-js `v0.288.1`)
-- **Path in repo:**
-  [`packages/chdman-linux-arm/chdman-armv7`](https://github.com/emmercm/chdman-js/blob/main/packages/chdman-linux-arm/chdman-armv7)
-- **Verified:** `ELF 32-bit LSB pie executable, ARM, EABI5 version 1 (SYSV),
-  static-pie linked, stripped`, 1,231,260 bytes
-
-Installed to `Scripts/.retrarr/chdman` on the MiSTer. Retrarr checks
-`command -v chdman` first, then falls back to that path.
-
----
-
 ## Rebuilding the DB after replacing a binary
 
 ```bash
