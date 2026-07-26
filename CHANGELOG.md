@@ -12,14 +12,24 @@ Sections used:
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.3.5] — 2026-07-26
+
+Alpha channel established. Rolling development branch for new
+feature testing before graduation to beta.
+
 ### Added
 
-- Bundled `chdman` (MAME 0.288.1, armv7l static from
-  [emmercm/chdman-js](https://github.com/emmercm/chdman-js)) to enable
-  CHD → CUE/BIN conversion for cores that don't read CHD natively
+- `downloader_retrarr.ini` at repo root — drop-in registration file
+  pointing at the alpha DB. Users install by placing this one file
+  in `/media/fat/`, no editing of shared config required
 - Explicit third-party binary attribution in
   [`bin/README.md`](bin/README.md) — upstream projects, static-build
-  sources, exact tags/versions, verified file properties
+  sources, exact tags/versions, verified file properties, GPL v2
+  compliance notes
+- Top-level `LICENSE` (MIT for Retrarr's source) and
+  `LICENSES/GPL-2.0.txt` for the bundled binaries
 - Skip-if-exists check in `download_roms` — files already present at
   the destination are counted separately and not re-downloaded;
   summary msgbox reports `N downloaded, M skipped, K failed`
@@ -29,13 +39,16 @@ Sections used:
 
 ### Changed
 
+- Version bumped `v0.3.4` → `v0.3.5` to mark the alpha channel
+- `db/build_db.sh` — branch detection uses `git branch --show-current`
+  (git 2.22+) instead of `git rev-parse --abbrev-ref HEAD`, which was
+  ambiguous when a tag shared the branch name
 - IA extract path now captures stderr+stdout and checks exit codes,
   surfacing the actual error text in a dialog + log instead of
   swallowing it behind `-qq`/`-y` and `&& rm -f`
 - AO486 branch order in `ia_download_rom` repaired — the previous
   condition made the AO486-specific `.mgl` setname post-processing
   unreachable dead code; 0MHz files now unzip and post-process correctly
-- README updated with bundled-binary note and current system count
 
 ### Fixed
 

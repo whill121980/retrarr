@@ -1,5 +1,5 @@
 #!/bin/zsh
-# retrarr.sh — Retro Retriever v0.3.4
+# retrarr.sh — Retro Retriever v0.3.5
 # Spiritual successor to MiSTer-ROMweasel by Koston-0xDEADBEEF
 #
 # Sources:
@@ -23,7 +23,7 @@ autoload zmv
 # ─── STATIC GLOBALS ────────────────────────────────────────────────────────────
 
 init_static_globals () {
-    typeset -gr RETRARR_VERSION="Retro Retriever v0.3.4"
+    typeset -gr RETRARR_VERSION="Retro Retriever v0.3.5"
 
     # Required binaries
     typeset -gr XMLLINT=$(which xmllint)  || { print -u2 "ERROR: xmllint not found"  ; return 1 }

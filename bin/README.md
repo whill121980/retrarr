@@ -56,11 +56,15 @@ Installed to `Scripts/.retrarr/aria2c` on the MiSTer. Retrarr checks
 
 ---
 
-## `chdman-mister` — CHD ↔ CUE/BIN converter
+## `chdman-mister` — CHD ↔ CUE/BIN converter (planned, not yet bundled)
 
-Used by Retrarr to convert Dreamcast (and other CD-format) downloads
-from CHD to formats accepted by cores that don't read CHD natively
-(e.g. DreamSTer wants `.cue`/`.gdi`/`.cdi`).
+> **Status:** researched and staged, not yet added to this branch.
+> The section below documents the intended source/version so the
+> bundling PR can proceed cleanly when Dreamcast support lands.
+
+Intended use: convert Dreamcast (and other CD-format) downloads from
+CHD to formats accepted by cores that don't read CHD natively (e.g.
+DreamSTer wants `.cue`/`.gdi`/`.cdi`).
 
 - **Upstream project:** [mamedev/mame](https://github.com/mamedev/mame)
   (chdman is part of MAME)

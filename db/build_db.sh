@@ -19,7 +19,10 @@ TIMESTAMP=$(date +%s)
 
 GITHUB_USER="whill121980"
 REPO_NAME="retrarr"
-BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "master")
+# --show-current (git 2.22+) is unambiguous even when a tag shares the
+# branch name. Fallback keeps CI/detached-HEAD builds sane.
+BRANCH=$(git -C "$REPO_ROOT" branch --show-current 2>/dev/null)
+[[ -z "$BRANCH" ]] && BRANCH="master"
 
 # Custom DBs are barred from writing to /media/fat/linux/ (Downloader_MiSTer
 # reserves that root folder for the official Distribution_MiSTer DB). Ship
