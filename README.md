@@ -48,6 +48,17 @@ Minerva Archive is a community-driven project that serves files via BitTorrent. 
 - **archive.org account** ([free registration](https://archive.org/account/signup))
 - All other dependencies are either pre-installed on MiSTer or installed automatically
 
+### Bundled third-party binaries
+
+Retrarr's install brings along two prebuilt static ARM binaries that MiSTer's
+Buildroot userland doesn't ship: `aria2c` (torrent downloader, needed for
+Minerva Archive sources) and `chdman` (CD image converter, needed to normalize
+CHD downloads to the formats some cores require). Both are sourced verbatim
+from public upstreams — no patches, no repackaging. Full attribution, source
+links, and verification instructions are in
+[`bin/README.md`](bin/README.md). Every binary is size- and md5-pinned in
+`db/retrarr.json`, so `update_all` rejects any file that doesn't match.
+
 ## Installation
 
 ### Option 1: Automatic (via downloader.ini)
