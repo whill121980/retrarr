@@ -1320,17 +1320,33 @@ PYEOF
     # Clean up torrent working directory (removes partial spillover files)
     rm -rf "$bt_dir"
 
-    # Extract to destination
+    # Extract to destination. Capture stderr+stdout so real errors survive
+    # the dialog repaint and land in the log.
     [[ -d $dest_dir ]] || mkdir -p "$dest_dir"
+    local extract_out extract_ret
     if [[ $ofile == *.zip ]]; then
-        $UNZIP -o -qq -d "$dest_dir" "$ofile" && rm -f "$ofile"
+        extract_out=$($UNZIP -o -d "$dest_dir" "$ofile" 2>&1)
+        extract_ret=$?
     elif [[ $ofile == *.7z ]]; then
-        $SZR e "$ofile" -o"$dest_dir" -y && rm -f "$ofile"
+        extract_out=$($SZR e "$ofile" -o"$dest_dir" -y 2>&1)
+        extract_ret=$?
     else
-        mv "$ofile" "$dest_dir"
+        extract_out=$(mv "$ofile" "$dest_dir" 2>&1)
+        extract_ret=$?
     fi
 
-    log_info "minerva_download_rom: complete -> $dest_dir"
+    if (( extract_ret != 0 )); then
+        log_error "minerva_download_rom: extract FAILED ($extract_ret) for $filename"
+        log_error "minerva_download_rom: extract output: $extract_out"
+        $DIALOG --title "Extract failed" --msgbox \
+"Failed to unpack:\n${filename}\n\nExit code: ${extract_ret}\n\n${extract_out}\n\nSee ~/.config/retrarr/retrarr.log for details." 14 72
+        return 1
+    fi
+
+    [[ $ofile == *.zip || $ofile == *.7z ]] && rm -f "$ofile"
+
+    log_info "minerva_download_rom: extracted $filename -> $dest_dir"
+    log_debug "minerva_download_rom: dest listing: $(ls -la "$dest_dir" 2>&1 | tail -5)"
     return 0
 }
 
