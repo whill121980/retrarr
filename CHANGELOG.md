@@ -10,6 +10,34 @@ Sections used:
 - **Changed** — updates to existing behavior, non-breaking refinements
 - **Fixed** — bug fixes
 
+## [0.2.3] — 2026-07-26
+
+P1 bootstrap fix ported down from v0.3 alpha.
+
+### Changed
+
+- `bootstrap_deps` no longer shows a yes/no confirmation before
+  installing `internetarchive` — matches v0.3 behavior. Launching
+  retrarr is opt-in enough; a confirmation dialog belonged on the
+  deprecated master branch (where the migration notice lives), not
+  on active channels.
+
+### Fixed
+
+- `bootstrap_deps` now verifies the `internetarchive` Python module
+  actually imports, not just that the `ia` CLI shim exists on PATH. A
+  stale shim without a working module would previously pass the check
+  and blow up later during `ia_login`.
+- `IA` global is no longer declared readonly, so `bootstrap_deps` can
+  reassign it after a fresh `pip install` succeeds. Previously, a truly
+  fresh install (no `ia` on PATH at startup) would set `IA=""` readonly
+  in `init_static_globals`, leaving the post-install reassignment
+  silently unable to take effect.
+- Switched `which ia` → `command -v ia` (POSIX standard, avoids
+  busybox `which` quirks).
+- `pip3 install internetarchive` → `pip3 install --upgrade internetarchive`
+  so a botched/half-installed module gets a clean re-install.
+
 ## [0.2.2] — 2026-07-26
 
 Beta channel established. Codebase equivalent to v0.2.1 with the

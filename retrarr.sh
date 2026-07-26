@@ -1,5 +1,5 @@
 #!/bin/zsh
-# retrarr.sh — Retro Retriever v0.2.2
+# retrarr.sh — Retro Retriever v0.2.3
 # Spiritual successor to MiSTer-ROMweasel by Koston-0xDEADBEEF
 #
 # Sources:
@@ -22,7 +22,7 @@ autoload zmv
 # ─── STATIC GLOBALS ────────────────────────────────────────────────────────────
 
 init_static_globals () {
-    typeset -gr RETRARR_VERSION="Retro Retriever v0.2.2"
+    typeset -gr RETRARR_VERSION="Retro Retriever v0.2.3"
 
     # Required binaries
     typeset -gr XMLLINT=$(which xmllint)  || { print -u2 "ERROR: xmllint not found"  ; return 1 }
@@ -41,7 +41,8 @@ init_static_globals () {
     typeset -gr ARIA2C=$(which aria2c 2>/dev/null || print "")
 
     # internetarchive CLI — pip3 install internetarchive
-    typeset -gr IA=$(which ia 2>/dev/null || print "")
+    # Not readonly: bootstrap_deps needs to reassign after a fresh install.
+    typeset -g IA=$(command -v ia 2>/dev/null)
 
     # MiSTer SSL CA bundle is outdated — suppress cert warnings
     # Fix: apt-get update && apt-get install -y ca-certificates && update-ca-certificates
@@ -648,13 +649,14 @@ PYEOF
 }
 
 bootstrap_deps () {
-    # Check if internetarchive CLI is installed; if not, offer to install it
-    [[ -n $IA ]] && return 0
+    # Verify BOTH the ia CLI AND the internetarchive Python module. A stale
+    # `ia` shim without a working module would otherwise short-circuit the
+    # check and blow up later in ia_login.
+    local module_ok=false
+    $PYTHON -c "import internetarchive" 2>/dev/null && module_ok=true
+    [[ -n $IA ]] && $module_ok && return 0
 
-    $DIALOG --title "First-Time Setup" --yesno \
-        "The internetarchive CLI (ia) is not installed.\n\nRetrarr needs it to download ROMs from archive.org.\n\nInstall it now? This will run:\n\n  python3 -m ensurepip\n  pip3 install --upgrade pip\n  pip3 install internetarchive\n\n(Requires internet connection)" \
-        16 65
-    [[ $? -ne $DIALOG_OK ]] && { print -u2 "Cannot continue without internetarchive CLI." ; exit 1 }
+    log_info "bootstrap_deps: installing internetarchive (CLI or module missing)"
 
     # Run install steps with progress feedback
     {
@@ -663,15 +665,15 @@ bootstrap_deps () {
         print "XXX\n40\nUpgrading pip...\nXXX"
         pip3 install --upgrade pip 2>&1
         print "XXX\n60\nInstalling internetarchive...\nXXX"
-        pip3 install internetarchive 2>&1
+        pip3 install --upgrade internetarchive 2>&1
         print "XXX\n100\nDone!\nXXX"
     } | $DIALOG --title "Installing Dependencies" --gauge "Starting..." 8 65 0
 
-    # Verify it worked
-    typeset -gr IA=$(which ia 2>/dev/null || print "")
-    if [[ -z $IA ]]; then
+    # Verify it worked — re-check both the CLI and the module
+    typeset -g IA=$(command -v ia 2>/dev/null)
+    if [[ -z $IA ]] || ! $PYTHON -c "import internetarchive" 2>/dev/null; then
         $DIALOG --title "Installation Failed" --msgbox \
-            "Could not install internetarchive CLI.\n\nCheck your network connection and try:\n\n  python3 -m ensurepip\n  pip3 install --upgrade pip\n  pip3 install internetarchive" \
+            "Could not install internetarchive CLI.\n\nCheck your network connection and try:\n\n  python3 -m ensurepip\n  pip3 install --upgrade pip\n  pip3 install --upgrade internetarchive" \
             12 65
         exit 1
     fi
