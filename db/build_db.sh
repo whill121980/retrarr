@@ -1,6 +1,7 @@
 #!/bin/bash
 # Regenerate db/retrarr.json with current hash, size, and timestamp.
-# Run this before pushing a new release.
+# URLs are pinned to the current git branch — run this after switching
+# branches or before pushing.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -16,9 +17,13 @@ HASH=$(md5sum "$RETRARR" | awk '{print $1}')
 SIZE=$(wc -c < "$RETRARR" | tr -d ' ')
 TIMESTAMP=$(date +%s)
 
-# TODO: Update GitHub username/org when repo is created
 GITHUB_USER="whill121980"
 REPO_NAME="retrarr"
+
+# --show-current (git 2.22+) is unambiguous even when a tag shares the
+# branch name. Fallback to master keeps CI/detached-HEAD builds sane.
+BRANCH=$(git -C "$REPO_ROOT" branch --show-current 2>/dev/null)
+[[ -z "$BRANCH" ]] && BRANCH="master"
 
 cat > "$DB_OUT" << EOF
 {
@@ -28,7 +33,7 @@ cat > "$DB_OUT" << EOF
     "Scripts/retrarr.sh": {
       "hash": "${HASH}",
       "size": ${SIZE},
-      "url": "https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NAME}/master/retrarr.sh"
+      "url": "https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NAME}/${BRANCH}/retrarr.sh"
     }
   },
   "folders": {
@@ -38,6 +43,7 @@ cat > "$DB_OUT" << EOF
 EOF
 
 echo "Updated $DB_OUT"
+echo "  branch:    $BRANCH"
 echo "  hash:      $HASH"
 echo "  size:      $SIZE"
 echo "  timestamp: $TIMESTAMP"
